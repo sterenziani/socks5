@@ -14,7 +14,7 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
-#include "aux/buffer.h"
+#include "buffer.h"
 #include "doh.h"
 
 #define ADDRESS_PORT 8080

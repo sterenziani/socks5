@@ -28,4 +28,4 @@ doh-start: doh-stop
 
 .PHONY: clean
 clean:
-	rm -rf resources/*.o *.o *.bin *.out proxy
+	rm -rf resources/*.o *.o *.bin *.out

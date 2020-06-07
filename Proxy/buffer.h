@@ -145,5 +145,19 @@ buffer_can_read(buffer *b);
 bool
 buffer_can_write(buffer *b);
 
+// funciones agregadas
+
+/** escribe el string en el buffer */
+size_t
+buffer_write_string(buffer *b, char string[]);
+
+/** cantidad de bytes que se pueden leer */
+size_t
+buffer_readable(buffer *b);
+
+/** cantidad de bytes que se pueden escribir */
+size_t
+buffer_writable(buffer *b);
+
 
 #endif
