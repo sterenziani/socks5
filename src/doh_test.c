@@ -14,15 +14,19 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 #include "aux/buffer.h"
+#include "doh.h"
 
 #define ADDRESS_PORT 8080
 #define ADDRESS "127.0.0.1"
 #define ADDRESS_TYPE AF_INET
 #define TIMEOUT_SEC 5
-#define WRITE_BUFFER 1
+
+//test variable
+#define HOST "google.com"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define BUFFER_MAX 1024
+#define INT_STRING_MAX 11
 
 int main(int argc, char *argv[])
 {
@@ -52,6 +56,16 @@ int main(int argc, char *argv[])
 		printf("Connect successful\n");
 	}
 
+  // create dns message
+  struct buffer message;
+  buffer *m = &message;
+  uint8_t direct_buff_m[BUFFER_MAX];
+  buffer_init(&message, N(direct_buff_m), direct_buff_m);
+  size_t contentLength = dnsEncode(HOST,AF_INET,m,BUFFER_MAX);
+  char contentLength_str[INT_STRING_MAX];
+  snprintf(contentLength_str, sizeof contentLength_str, "%zu", contentLength);
+
+
   // make http request
 
   //create request buffer
@@ -60,11 +74,28 @@ int main(int argc, char *argv[])
   uint8_t direct_buff_req[BUFFER_MAX];
   buffer_init(&request, N(direct_buff_req), direct_buff_req);
 
-  buffer_write_string(req,"GET / HTTP/1.0\r\nHost: ");
+  buffer_write_string(req,"POST /dns-query HTTP/1.1\r\nHost: ");
   buffer_write_string(req,ADDRESS);
   buffer_write_string(req,":");
-  buffer_write_string(req,"8080\r\n");
-  buffer_write_string(req,"Connection: close\r\n\r\n");
+  buffer_write_string(req,"8080\r\n");  // modifiy later to sprintf
+  buffer_write_string(req,"Content-Type: application/dns-message\r\n");
+  buffer_write_string(req,"Accept: application/dns-message\r\n");
+  buffer_write_string(req,"Connection: close\r\n");
+  buffer_write_string(req,"Content-Length: ");
+  buffer_write_string(req,contentLength_str);
+  buffer_write_string(req,"\r\n\r\n");
+
+  // copying the dns-message
+  while(buffer_can_read(m) && buffer_can_write(req)){
+    buffer_write(req,buffer_read(m));
+  }
+
+  if(!buffer_can_write(req)){
+    perror("host name is too long");
+    return -1;
+  }
+
+  buffer_write_string(req,"\r\n\r\n");
 
   // connect to HTTP
   size_t bytes_sent       = 0;
