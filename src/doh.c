@@ -79,9 +79,13 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
     buffer_write(b,(uint8_t)(labelLen));
     octetCount++;
 
-    while(*hostPointer!='.' || *hostPointer!='\0'){
+    while(*hostPointer!='.' && *hostPointer!='\0'){
       buffer_write(b,(uint8_t)(*hostPointer));
       octetCount++;
+      hostPointer++;
+    }
+
+    if(*hostPointer=='.'){
       hostPointer++;
     }
 

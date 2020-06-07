@@ -3,6 +3,7 @@
 * currently has all functions that doh.c should have
 */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <signal.h>
 #include <stdio.h>
@@ -121,6 +122,7 @@ int main(int argc, char *argv[])
 
   struct timespec timeout;
   timeout.tv_sec = TIMEOUT_SEC;
+  timeout.tv_nsec = 0;
 
   sigset_t blockset;
 
@@ -130,7 +132,7 @@ int main(int argc, char *argv[])
 
   while(1){
     if(pselect(sockfd+1,&socketSet,NULL,NULL,&timeout,&blockset)==-1){
-      perror("Problem with select");
+      perror("Select error");
       return 1;
     }
 
@@ -160,6 +162,7 @@ int main(int argc, char *argv[])
     }
   }
 
+  // falta el decode
   while(buffer_can_read(res)){
     printf("%c",buffer_read(res));
   }
