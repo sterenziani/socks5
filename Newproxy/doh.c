@@ -128,9 +128,11 @@ solveDomain(const char* host, int dnsType, buffer *r)
   // parsear hasta el final
 
   // falta el decode
+  /*
   while(buffer_can_read(res)){
     printf("%c",buffer_read(res));
   }
+  */
 
   shutdown(sockfd, SHUT_RDWR);
 

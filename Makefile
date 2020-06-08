@@ -42,6 +42,7 @@ doh-start: doh-stop
 
 .PHONY: tests
 tests: $(TESTS)
+	./*_test
 
 .PHONY: clean
 clean:

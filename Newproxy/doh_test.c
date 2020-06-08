@@ -3,6 +3,7 @@
 * currently has all functions that doh.c should have
 */
 
+#include <assert.h>
 #include <stdlib.h>
 #include <errno.h>
 #include <stdio.h>
@@ -22,18 +23,24 @@
 #define BUFFER_MAX 1024
 #define INT_STRING_MAX 11
 
+// test functions
+void test_connect(void);
+
 int main(int argc, char *argv[])
 {
+  test_connect();
+  return 0;
+}
+
+void test_connect(void){
   struct buffer message;
   buffer *m = &message;
   uint8_t direct_buff_m[BUFFER_MAX];
   buffer_init(&message, N(direct_buff_m), direct_buff_m);
 
   size_t result = solveDomain(HOST,DNS_TYPE,m);
-  if(result != 0){
-    perror("domain failed to solve");
-    return 1;
-  }
+  assert(result==0);
+  printf("doh_test/connect: success!\n");
 
-  return 0;
+  return;
 }
