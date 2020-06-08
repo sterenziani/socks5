@@ -101,3 +101,30 @@ buffer_compact(buffer *b) {
         b->write = b->data + n;
     }
 }
+
+size_t
+buffer_write_string(buffer *b, char string[]) {
+
+  size_t i;
+
+  for(i=0; string[i]!=0; i++){
+    if(!buffer_can_write(b)){
+      return i;
+    }
+
+    buffer_write(b,(uint8_t) string[i]);
+  }
+
+  return i;
+}
+
+size_t
+buffer_readable(buffer *b){
+  return (size_t)(b->write-b->read);
+}
+
+
+size_t
+buffer_writable(buffer *b){
+  return (size_t)(b->limit-b->write);
+}

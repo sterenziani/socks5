@@ -5,10 +5,10 @@
 # Variables para compilador C
 CC=gcc
 CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
-DIR=Proxy
-DEPS=Proxy/buffer.h Proxy/doh.h
+DIR=NewProxy
+DEPS=$(DIR)/buffer.h $(DIR)/doh.h
 OBJ=$(DEPS:.h=.o)
-DOH_TEST=Proxy/doh_test.o
+TESTS=doh_test
 
 # Variables para doh Server
 ## Al modificar el puerto, recordar tambien modificar dicho valor en Proxy/doh.c
@@ -41,8 +41,8 @@ doh-start: doh-stop
 	rm -rf $@.o
 
 .PHONY: tests
-tests: doh_test
+tests: $(TESTS)
 
 .PHONY: clean
 clean:
-	rm -rf Proxy/*.o Proxy/*.out Proxy/*.dSYM *.o *.bin *.out *_test
+	rm -rf $(DIR)/*.o $(DIR)/*.out $(DIR)/*.dSYM *.o *.bin *.out *_test
