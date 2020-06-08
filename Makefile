@@ -3,8 +3,8 @@
 ##
 
 # Variables para compilador C
-GCC=gcc
-GCCFLAGS= -pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
+CC=gcc
+CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 
 # Variables para doh Server
 DOCKER=sudo docker
@@ -28,4 +28,4 @@ doh-start: doh-stop
 
 .PHONY: clean
 clean:
-	rm -rf resources/*.o *.o *.bin *.out
+	rm -rf Proxy/*.o Proxy/*.out Proxy/*.dSYM *.o *.bin *.out
