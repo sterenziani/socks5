@@ -41,7 +41,7 @@ void test_returns(void){
 
   size_t result = solveDomain(HOST,DNS_TYPE,m);
   assert(result==0);
-  printf("doh_test/connect: success!\n");
+  printf("doh_test/connect:\tsuccess!\n");
 
   return;
 }

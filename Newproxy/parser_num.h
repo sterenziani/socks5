@@ -11,27 +11,17 @@
 
 enum num_states {
     NUMS_NUM,
-    NUMS_R,
-    NUMS_INV,
     NUMS_END
 };
 
 enum num_event_type {
     NUMS_EVENT_OK,
-    NUMS_EVENT_ERROR,
     NUMS_EVENT_END
 };
 
 static void
 is_NUMS_ok(struct parser_event *ret, const uint8_t c) {
     ret->type    = NUMS_EVENT_OK;
-    ret->n       = 1;
-    ret->data[0] = c;
-}
-
-static void
-is_NUMS_error(struct parser_event *ret, const uint8_t c) {
-    ret->type    = NUMS_EVENT_ERROR;
     ret->n       = 1;
     ret->data[0] = c;
 }
@@ -54,24 +44,14 @@ static const struct parser_state_transition NUMST_NUM [] =  {
     {.when = '7',        .dest = NUMS_NUM,        .act1 = is_NUMS_ok,},
     {.when = '8',        .dest = NUMS_NUM,        .act1 = is_NUMS_ok,},
     {.when = '9',        .dest = NUMS_NUM,        .act1 = is_NUMS_ok,},
-    {.when = '\r',       .dest = NUMS_R,          .act1 = is_NUMS_end,},
-    {.when = ANY,        .dest = NUMS_INV,        .act1 = is_NUMS_error,},
-};
-static const struct parser_state_transition NUMST_R [] =  {
-    {.when = '\n',       .dest = NUMS_END,       .act1 = is_NUMS_end,},
-    {.when = ANY,        .dest = NUMS_INV,       .act1 = is_NUMS_error,},
-};
-static const struct parser_state_transition NUMST_INV [] =  {
-    {.when = ANY,        .dest = NUMS_INV,        .act1 = is_NUMS_error,},
+    {.when = ANY,        .dest = NUMS_END,        .act1 = is_NUMS_end,},
 };
 static const struct parser_state_transition NUMST_END [] =  {
-    {.when = ANY,        .dest = NUMS_INV,        .act1 = is_NUMS_error,},
+    {.when = ANY,        .dest = NUMS_END,        .act1 = is_NUMS_end,},
 };
 
 static const struct parser_state_transition *num_states [] = {
     NUMST_NUM,
-    NUMST_R,
-    NUMST_INV,
     NUMST_END,
 };
 
@@ -79,8 +59,6 @@ static const struct parser_state_transition *num_states [] = {
 
 static const size_t num_states_n [] = {
     N(NUMST_NUM),
-    N(NUMST_R),
-    N(NUMST_INV),
     N(NUMST_END),
 };
 

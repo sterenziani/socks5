@@ -19,8 +19,10 @@
 #include <netdb.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+
 #include "buffer.h"
 #include "doh.h"
+#include "parser_doh.h"
 
 //defines
 
@@ -59,5 +61,9 @@ httpEncode(char* doh, buffer *req, buffer *dnsMessage, char *contentLength);
 // recibe un fd y un http-request, manda dicho request por el file descriptor
 size_t
 sendHttpMessage(int fd, buffer *request);
+
+// manda todo lo readable del buffer al parser doh
+int
+feedParser(struct parser_doh *p, buffer *b);
 
 #endif // DOH_H_

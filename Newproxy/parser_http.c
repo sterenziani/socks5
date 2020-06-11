@@ -3,7 +3,12 @@
 #include <ctype.h>
 
 #include "parser.h"
-#include "parser_crlf.h"
+#include "parser_http.h"
+
+struct parser_definition
+get_parser_http_definition(void) {
+  return parser_http_definition;
+}
 
 struct parser_definition
 get_parser_crlf_definition(void) {

@@ -86,12 +86,19 @@ solveDomain(const char* host, int dnsType, buffer *r)
   sigset_t blockset;
 
   sigemptyset(&blockset);
-  //sigaddset(&blockset, SIGINT);
+  sigaddset(&blockset, SIGINT);
   sigprocmask(SIG_BLOCK, &blockset, NULL);
 
-  while(1){
+  struct parser_doh *myDohParser = parser_doh_init();
+
+  int n=0;
+  do{
 
     //hacer el parseo
+    if(feedParser(myDohParser,res)!=0){
+      perror("Parsing error: ");
+      return -1;
+    }
 
     if(pselect(sockfd+1,&socketSet,NULL,NULL,&timeout,&blockset)==-1){
       perror("Select error");
@@ -102,30 +109,30 @@ solveDomain(const char* host, int dnsType, buffer *r)
 
       if(!buffer_can_write(res)){
         perror("Can't write on response buffer");
-        break;
+        return -1;
       }
       size_t max_write;
       uint8_t *write_dir = buffer_write_ptr(res,&max_write);
 
-      int n;
       n = read(sockfd, write_dir, max_write);		//Reads the buffer
       buffer_write_adv(res,n);
       if (n < 0){
         perror("Error on reading");
-        break;
-      }else if(n == 0){
-        // termine de leer todo
         break;
       }
 
     }else{
       // timed out
       perror("Connection timed out");
-      break;
+      return -1;
     }
-  }
+  }while(n!=0);
 
-  // parsear hasta el final
+  //hacer el parseo
+  if(feedParser(myDohParser,res)!=0){
+    perror("Parsing error: ");
+    return -1;
+  }
 
   // falta el decode
   /*
@@ -305,4 +312,36 @@ sendHttpMessage(int fd, buffer *req){
   }
 
   return total_bytes_sent;
+}
+
+int
+feedParser(struct parser_doh *p, buffer *b){
+
+  unsigned status;
+
+  while(buffer_can_read(b)){
+    status = parser_doh_feed(p, buffer_read(b));
+    switch (status) {
+      // error cases
+      case HTTP_INVALID_CODE:
+          perror("doh request returned invalid code\n");
+          break;
+      case HTTP_HEADER:
+          break;
+      case HTTP_PARSED_CODE:
+          if(parser_doh_getStatusCode(p)<200 || parser_doh_getStatusCode(p)>=300){
+            perror("http request returned error code\n");
+            return -1;
+            break;
+          }
+      case DOH_FINISHED:
+        break;
+      default:
+          // dejo los casos en caso de que querer hacer algo como logear el progreso
+          break;
+
+    }
+  }
+
+  return 0;
 }
