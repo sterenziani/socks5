@@ -59,6 +59,7 @@ struct parser_doh {
 
     // los parsers involucrados
     struct parser *parser_http;
+    struct parser *parser_crlf;
     struct parser *parser_te;
     struct parser *parser_ct;
     struct parser *parser_cl;
@@ -97,6 +98,7 @@ parser_doh_init(void){
       }
 
       ret->parser_http = parser_init(parser_no_classes(), &parser_http_definition);
+      ret->parser_crlf = parser_init(parser_no_classes(), &parser_crlf_definition);
       ret->parser_te = parser_init(parser_no_classes(), ret->parser_definition_te);
       ret->parser_ct = parser_init(parser_no_classes(), ret->parser_definition_ct);
       ret->parser_cl = parser_init(parser_no_classes(), ret->parser_definition_cl);
@@ -110,6 +112,7 @@ parser_doh_destroy(struct parser_doh *p) {
     if(p != NULL) {
 
       parser_destroy(p->parser_http);
+      parser_destroy(p->parser_crlf);
       parser_destroy(p->parser_te);
       parser_destroy(p->parser_ct);
       parser_destroy(p->parser_cl);
@@ -122,10 +125,6 @@ parser_doh_destroy(struct parser_doh *p) {
       free(p->parser_definition_te);
       free(p->parser_definition_ct);
       free(p->parser_definition_cl);
-
-      if(p->addrInfo_root!=NULL){
-        freeaddrinfo(p->addrInfo_curr);
-      }
 
       free(p);
     }
@@ -396,6 +395,36 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
       p->contentLength--;
     }else if(p->is_chunked){
       // hacer el parseo de chunked
+      const struct parser_event *r;
+      r = parser_feed(p->parser_crlf,c);
+      switch (r->type) {
+        case HTTP_S_EVENT_CRLF:
+          //crlf de len
+          p->contentLength = p->chunkLength;
+          break;
+        case HTTP_S_EVENT_END:
+          //parsee mensaje
+          parser_reset(p->parser_crlf);
+          if(p->chunkLength==0){
+            // no mas contenido
+            p->status_http = DOH_FINISHED;
+            p->stage = STAGE_END;
+          }else{
+            p->chunkLength=0;
+          }
+          break;
+        case HTTP_S_EVENT_NOTHING:  //  tengo un numero
+        default:
+          if(c != '\r'){
+            int aux = hexCharToInt(c);
+            if(aux<0){
+              p->stage = STAGE_ERROR;
+              p->status_http = DNS_ERROR;
+            }else{
+              p->chunkLength = p->chunkLength * 0x10 + aux;
+            }
+          }
+      }
     }else{
       // termine
       p->status_http = DOH_FINISHED;

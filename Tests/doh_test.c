@@ -69,6 +69,7 @@ void test_returns(void){
   printf("doh_test/can_connect_to_returned_address:\tsuccess!\n");
 
   shutdown(sockfd, SHUT_RDWR);
+  freeaddrinfo(res_doh);
 
   return;
 }

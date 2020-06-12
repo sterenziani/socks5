@@ -148,11 +148,10 @@ solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo)
     return -1;
   }
 
-  parser_doh_destroy(myDohParser);
-  shutdown(sockfd, SHUT_RDWR);
-
   int err;
   *ret_addrInfo = parser_doh_getAddrInfo(myDohParser, &err);
+  parser_doh_destroy(myDohParser);
+  shutdown(sockfd, SHUT_RDWR);
 
 	return err;
 }
@@ -333,6 +332,6 @@ feedParser(struct parser_doh *p, buffer *b){
       return -1;
     }
   }
-
+  buffer_reset(b);
   return 0;
 }
