@@ -372,7 +372,6 @@ static unsigned hello_read(struct selector_key *key) {
 
 /** procesamiento del mensaje `hello' */
 static unsigned hello_process(const struct hello_st* d) {
-    fprintf(stdout, "entra al process\n" );
     unsigned ret = HELLO_WRITE;
 
     uint8_t m = d->method;
@@ -390,7 +389,6 @@ static void hello_read_close(const unsigned state, struct selector_key *key){
 }
 
 static void hello_write_close(const unsigned state, struct selector_key *key){
-  fprintf(stdout, "cerrando write");
 }
 
 
@@ -422,10 +420,6 @@ static unsigned request_write(struct selector_key *key) {
     }
 
     uint8_t *ptr = buffer_read_ptr(d->wb, &count);
-
-    fprintf(stdout, "count %ld\n", count );
-
-
     if(count < 10) {
       abort();
     }
@@ -451,40 +445,40 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
     unsigned ret = REQUEST_WRITE;
     uint8_t port[2] = {d->parser.port[0], d->parser.port[1]};
     unsigned short int p = ntohs(*((unsigned short int*)port));
-    fprintf(stdout, "%hu\n",p );
     switch(d->parser.command){
       case req_connect:
         if(d->parser.address_type == ipv4){
             char ip[16];
             snprintf(ip, 16, "%hhu.%hhu.%hhu.%hhu", d->parser.address[0], d->parser.address[1], d->parser.address[2], d->parser.address[3]);
-            fprintf(stdout, "IP: %s\n", ip);
             struct sockaddr_in address;
             memset(&address, 0, sizeof(address));
             address.sin_family = AF_INET;
             sock->origin_fd = socket(AF_INET, SOCK_STREAM, 0);
             address.sin_addr.s_addr = inet_addr(ip);
             address.sin_port = htons(p);
-             fprintf(stdout, "New connection , socket fd is %d , ip is : %s , port : %d \n" , sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
             if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) == -1){
-              fprintf(stdout, "algo fallo al conectarsse \n");
               if(errno == EINPROGRESS) {
                 selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
                 if(SELECTOR_SUCCESS != st) {
-                  fprintf(stdout, "no me pude conectar");
                   return ERROR;
                 }
                 st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
                 if(SELECTOR_SUCCESS != st) {
-                                      fprintf(stdout, "no  se que pasa si esta aca");
-  
-                      return ERROR;
-                  }
+                  return ERROR;
                 }
-
               }
-
             }
+        }
+        else if(d->parser.address_type == domain)
+        {
+          fprintf(stdout, "Eso es un domain. No implementado!\n");
+        }
+        else if(d->parser.address_type == ipv6)
+        {
+          fprintf(stdout, "Eso es una IPv6. No implementado!\n");
+        }
         break;
       case req_bind:
         break;
@@ -516,7 +510,6 @@ static unsigned request_read(struct selector_key *key) {
         if(request_is_done(st, 0)) {
             if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
                 ret = request_process(d, key);
-                fprintf(stdout, "sali de process\n");
             } else {
                 ret = ERROR;
             }
@@ -524,8 +517,6 @@ static unsigned request_read(struct selector_key *key) {
     } else {
         ret = ERROR;
     }
-                    fprintf(stdout, "saliendo de read");
-
     return error ? ERROR : ret;
 }
 
@@ -547,26 +538,24 @@ static void copy_init(const unsigned state, struct selector_key *key) {
 static void copy_close(const unsigned state, struct selector_key *key){
 }
 
-static unsigned copy_paste_buffer(buffer *from, buffer *to, ssize_t  bytes_to_read){
+static unsigned copy_paste_buffer(buffer *from, buffer *to, ssize_t bytes_to_read){
+
     unsigned ret = COPY;
     size_t n;
     uint8_t aux[bytes_to_read];
-    size_t size = 0;
-    while(buffer_can_read(from)) {
-      aux[size] = buffer_read(from);
-      size ++;
-    }
+    size_t i = 0;
 
     buffer_write_ptr(to, &n);
+    if(n > (size_t) bytes_to_read)
+      n = (size_t) bytes_to_read;
 
-    if(n<size){
-      return ERROR;
+    for(i=0; i < n; i++){
+      aux[i] = buffer_read(from);
     }
 
-    for(size_t j = 0; j<size; j++) {
+    for(size_t j = 0; j<i; j++) {
       buffer_write(to, aux[j]);
     }
-
     return ret;
 }
 
@@ -576,52 +565,107 @@ static unsigned copy_read(struct selector_key *key) {
       struct socks5 *sock = ATTACHMENT(key);
       unsigned ret = COPY;
 
+      uint8_t *ptr;
+      size_t  count;
+      ssize_t  n;
+
       if(key->fd == sock->origin_fd){
-        uint8_t *ptr;
-        size_t  count;
-        ssize_t  n;
         ptr = buffer_write_ptr(d_orig->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
+          fprintf(stdout, "Connection with origin server %d lost\n", key->fd);
+          shutdown(sock->origin_fd, SHUT_RD);
+          shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
         }
         buffer_write_adv(d_orig->rb, n);
-        ret = copy_paste_buffer(d_orig->rb, d_cli->wb, n);
-        if(ret == COPY){
-          ptr = buffer_read_ptr(d_cli->wb, &count);
-          if(send(sock->client_fd, ptr, count, MSG_DONTWAIT) < 0){
-            ret = ERROR;
-          }
-
+        selector_status st = selector_set_interest(key->s, sock->origin_fd, OP_NOOP);
+        // En rb quedo lo que vamos a leer ahora
+        st = selector_set_interest(key->s, sock->client_fd, OP_WRITE);
+        if(st != SELECTOR_SUCCESS)
+        {
+          ret = ERROR;
         }
-
       }
       else if(key->fd == sock->client_fd){
-        uint8_t *ptr;
-        size_t  count;
-        ssize_t  n;
         ptr = buffer_write_ptr(d_cli->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
+          fprintf(stdout, "Connection with client %d lost\n", key->fd);
+          shutdown(sock->origin_fd, SHUT_RD);
+          shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
         }
         buffer_write_adv(d_cli->rb, n);
-        ret = copy_paste_buffer(d_cli->rb, d_orig->wb, n);
-        if(ret == COPY){
-          ptr = buffer_read_ptr(d_orig->wb, &count);
-          if(send(sock->origin_fd, ptr, count, MSG_DONTWAIT) < 0){
-            ret = ERROR;
-          }
-
+        selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+        // En rb quedo lo que vamos a leer ahora
+        st = selector_set_interest(key->s, sock->origin_fd, OP_WRITE);
+        if(st != SELECTOR_SUCCESS)
+        {
+          ret = ERROR;
         }
-
       }
       else
-        fprintf(stdout, "Que miedo quien nos llama fd: %d\n", key->fd);
+      {
+        fprintf(stdout, "Unexpected fd: %d\n", key->fd);
+        abort();
+      }
   return ret;
-  }
+}
 
+static unsigned copy_write(struct selector_key *key) {
+      struct copy_st *d_cli = &ATTACHMENT(key)->client.copy;
+      struct copy_st *d_orig = &ATTACHMENT(key)->orig.copy;
+      struct socks5 *sock = ATTACHMENT(key);
+      unsigned ret = COPY;
 
+      uint8_t *ptr;
+      size_t  count;
+      size_t  n;
+
+      if(key->fd == sock->origin_fd)
+      {
+        buffer_read_ptr(d_cli->rb, &n);
+        ret = copy_paste_buffer(d_cli->rb, d_orig->wb, n);
+        if(ret == COPY)
+        {
+          // count = cuanto tengo para enviar
+          ptr = buffer_read_ptr(d_orig->wb, &count);
+          if(send(sock->origin_fd, ptr, count, MSG_DONTWAIT) < 0)
+            ret = ERROR;
+          else
+          {
+            buffer_read_adv(d_orig->wb, count);
+            fprintf(stdout, "Sent %d -> %d\n", sock->client_fd, sock->origin_fd);
+            buffer_compact(d_orig->wb);
+          }
+        }
+      }
+      else if(key->fd == sock->client_fd)
+      {
+        buffer_read_ptr(d_orig->rb, &n);
+        ret = copy_paste_buffer(d_orig->rb, d_cli->wb, n);
+        if(ret == COPY)
+        {
+          ptr = buffer_read_ptr(d_cli->wb, &count);
+          if(send(sock->client_fd, ptr, count, MSG_DONTWAIT) < 0)
+            ret = ERROR;
+          else
+          {
+            buffer_read_adv(d_cli->wb, count);
+            fprintf(stdout, "Sent %d <- %d\n", sock->client_fd, sock->origin_fd);
+            buffer_compact(d_cli->wb);
+          }
+        }
+      }
+      selector_status st = selector_set_interest(key->s, sock->origin_fd, OP_READ);
+      st = selector_set_interest(key->s, sock->client_fd, OP_READ);
+      if(st != SELECTOR_SUCCESS)
+      {
+        ret = ERROR;
+      }
+      return ret;
+}
 
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
@@ -654,7 +698,7 @@ static const struct state_definition client_statbl[] = {
       .on_arrival       = copy_init,
       .on_departure     = copy_close,
       .on_read_ready    = copy_read,
-
+      .on_write_ready    = copy_write,
     },
     {
       .state            = DONE,
@@ -714,7 +758,7 @@ static void socksv5_close(struct selector_key *key) {
 }
 
 static void socksv5_done(struct selector_key* key) {
-      fprintf(stdout, "Hola\n");
+    fprintf(stdout, "Closing connection between file descriptors %d-%d\n", ATTACHMENT(key)->client_fd, ATTACHMENT(key)->origin_fd);
     const int fds[] = {
         ATTACHMENT(key)->client_fd,
         ATTACHMENT(key)->origin_fd,
@@ -724,7 +768,6 @@ static void socksv5_done(struct selector_key* key) {
         if(fds[i] != -1) {
             if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i]))
             {
-                fprintf(stdout, "ABORTANDO AL INGENIERO\n");
                 abort();
             }
             close(fds[i]);

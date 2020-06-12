@@ -229,7 +229,6 @@ request_marshall(buffer *b, const uint8_t atyp,
     if(n < 10) {
         return -1;
     }
-    fprintf(stdout, "El valor de n es: %ld\n", n);
     buff[0] = 0x05;
     buff[1] = 0x00;
     buff[2] = 0x00;
