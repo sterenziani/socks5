@@ -483,67 +483,9 @@ void test_doh_ok(void){
 
   buffer_write_string(m,"http/1.1 200 \rOK\r\nContent-Type: application/dns-message\r\n");
 
-
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_PARSED_CODE == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-  assert(HTTP_HEADER == parser_doh_feed(parser,buffer_read(m)));
-
+  while(buffer_can_read(m)){
+    parser_doh_feed(parser,buffer_read(m));
+  }
 
   assert(parser_doh_getStatusCode(parser) == 200);
   assert(parser_doh_isValidContentType(parser) == 1);

@@ -7,7 +7,7 @@
 
 // main function
 size_t
-solveDomain(const char* host, int dnsType, buffer *r)
+solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo)
 {
   int sockfd;
   struct sockaddr_in server;
@@ -31,10 +31,12 @@ solveDomain(const char* host, int dnsType, buffer *r)
     char errno_str[BUFFER_MAX];
     snprintf(errno_str, sizeof errno_str, "Connection failed: errno %d\n", (int) errno);
 		perror(errno_str);
+    shutdown(sockfd, SHUT_RDWR);
 		return -1;
 	} else if(errno == EINPROGRESS) {
     if(pselect(sockfd+1,NULL,&socketSet,NULL,NULL,NULL)==-1){
       perror("Select error");
+      shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
 	}
@@ -61,6 +63,7 @@ solveDomain(const char* host, int dnsType, buffer *r)
 
   if(httpEncode(server_str, req, m, contentLength_str) < 0){
     perror("Encoding http message failed\n");
+    shutdown(sockfd, SHUT_RDWR);
     return -1;
   }
 
@@ -68,6 +71,7 @@ solveDomain(const char* host, int dnsType, buffer *r)
   size_t bytes_sent = sendHttpMessage(sockfd,req);
   if(bytes_sent<0){
     perror("send http message failed");
+    shutdown(sockfd, SHUT_RDWR);
     return -1;
   }
 
@@ -97,11 +101,15 @@ solveDomain(const char* host, int dnsType, buffer *r)
     //hacer el parseo
     if(feedParser(myDohParser,res)!=0){
       perror("Parsing error: ");
+      parser_doh_destroy(myDohParser);
+      shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
 
     if(pselect(sockfd+1,&socketSet,NULL,NULL,&timeout,&blockset)==-1){
       perror("Select error");
+      parser_doh_destroy(myDohParser);
+      shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
 
@@ -109,6 +117,8 @@ solveDomain(const char* host, int dnsType, buffer *r)
 
       if(!buffer_can_write(res)){
         perror("Can't write on response buffer");
+        parser_doh_destroy(myDohParser);
+        shutdown(sockfd, SHUT_RDWR);
         return -1;
       }
       size_t max_write;
@@ -124,6 +134,8 @@ solveDomain(const char* host, int dnsType, buffer *r)
     }else{
       // timed out
       perror("Connection timed out");
+      parser_doh_destroy(myDohParser);
+      shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
   }while(n!=0);
@@ -131,19 +143,18 @@ solveDomain(const char* host, int dnsType, buffer *r)
   //hacer el parseo
   if(feedParser(myDohParser,res)!=0){
     perror("Parsing error: ");
+    parser_doh_destroy(myDohParser);
+    shutdown(sockfd, SHUT_RDWR);
     return -1;
   }
 
-  // falta el decode
-  /*
-  while(buffer_can_read(res)){
-    printf("%c",buffer_read(res));
-  }
-  */
-
+  parser_doh_destroy(myDohParser);
   shutdown(sockfd, SHUT_RDWR);
 
-	return 0;
+  int err;
+  *ret_addrInfo = parser_doh_getAddrInfo(myDohParser, &err);
+
+	return err;
 }
 
 void
@@ -317,29 +328,9 @@ sendHttpMessage(int fd, buffer *req){
 int
 feedParser(struct parser_doh *p, buffer *b){
 
-  unsigned status;
-
   while(buffer_can_read(b)){
-    status = parser_doh_feed(p, buffer_read(b));
-    switch (status) {
-      // error cases
-      case HTTP_INVALID_CODE:
-          perror("doh request returned invalid code\n");
-          break;
-      case HTTP_HEADER:
-          break;
-      case HTTP_PARSED_CODE:
-          if(parser_doh_getStatusCode(p)<200 || parser_doh_getStatusCode(p)>=300){
-            perror("http request returned error code\n");
-            return -1;
-            break;
-          }
-      case DOH_FINISHED:
-        break;
-      default:
-          // dejo los casos en caso de que querer hacer algo como logear el progreso
-          break;
-
+    if( parser_doh_feed(p, buffer_read(b)) == STAGE_ERROR ){
+      return -1;
     }
   }
 

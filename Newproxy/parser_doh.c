@@ -3,7 +3,7 @@
 /* CDT del parser_doh */
 struct parser_doh {
 
-    // el status que devuelve el http response
+    // el status_http que devuelve el http response
     unsigned statusCode;
 
     // la longitud del dns-message
@@ -15,23 +15,47 @@ struct parser_doh {
     // el tamaño del siguiente chunk
     size_t chunkLength;
 
-    // el index del dns-message, útil para saber donde estamos parados
-    size_t dnsIndex;
-
     // cantidad de questions, para saber cuanto saltear
     size_t dnsQuestions;
 
     // cantidad de answers, para ir preparando el addrinfo
     size_t dnsAnswers;
 
+    // para saber si content type es reliable
+    int is_connectionClose;
+
     // si el content type es valido
     int is_validContentType;
 
-    // el ultimo evento
-    unsigned status;
+    // el ultimo evento (a nivel http)
+    unsigned status_http;
+
+    // estado a nivel dns
+    unsigned status_dns;
+
+    // el index del dns-message, útil para saber donde estamos parados
+    size_t dnsIndex;
+
+    // memory index, útil para hacer acciones con "x lugares alejados"
+    size_t prev_dnsIndex;
+
+    // el response type
+    unsigned dnsResponseType;
+
+    // el response RDLENGTH
+    size_t dnsRDLength;
+
+    // el index del sa_addr
+    unsigned dnsRDATA;
 
     // estado actual
     unsigned stage;
+
+    // addrinfo, the "head" of the linked list
+    struct addrinfo *addrInfo_root;
+
+    // addrinfo, the one currently being worked on
+    struct addrinfo *addrInfo_curr;
 
     // los parsers involucrados
     struct parser *parser_http;
@@ -51,8 +75,6 @@ parser_doh_init(void){
   struct parser_doh *ret = malloc(sizeof(*ret));
   if(ret != NULL) {
       memset(ret, 0, sizeof(*ret));
-
-      //ret->state = HTTP_BEFORE_CODE;
 
       ret->stage = STAGE_HTTP;
 
@@ -101,6 +123,10 @@ parser_doh_destroy(struct parser_doh *p) {
       free(p->parser_definition_ct);
       free(p->parser_definition_cl);
 
+      if(p->addrInfo_root!=NULL){
+        freeaddrinfo(p->addrInfo_curr);
+      }
+
       free(p);
     }
 }
@@ -112,8 +138,6 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
 
   if(p->stage == STAGE_HTTP){
 
-    p->status = HTTP_HEADER;
-
     r = parser_feed(p->parser_http,c);
     switch (r->type) {
       case HTTP_S_EVENT_PARSED_CODE:
@@ -124,7 +148,11 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
             p->statusCode = p->statusCode * 10 + (c - '0');
             break;
           case NUMS_EVENT_END:
-            p->status = HTTP_PARSED_CODE;
+            p->status_http = HTTP_PARSED_CODE;
+            if(p->statusCode < 200 || p->statusCode >= 300){
+              p->stage = STAGE_ERROR;
+              p->status_http = HTTP_INVALID_CODE;
+            }
             parser_reset(p->parser_num);
             break;
         }
@@ -138,13 +166,14 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
         }
         if(!p->is_chunked){
 
-          if(p->parser_cl->state == STRING_CMP_EQ){
+          if(p->status_http == HTTP_PARSING_CL){
             r2 = parser_feed(p->parser_num,c);
             switch (r2->type) {
               case NUMS_EVENT_OK:
                 p->contentLength = p->contentLength * 10 + (c - '0');
                 break;
               case NUMS_EVENT_END:
+                p->status_http = HTTP_HEADER;
                 parser_reset(p->parser_cl);
                 parser_reset(p->parser_num);
                 break;
@@ -152,6 +181,9 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
           }else{
 
             r2 = parser_feed(p->parser_cl,c);
+            if(r2->type == STRING_CMP_EQ){
+              p->status_http = HTTP_PARSING_CL;
+            }
 
             r2 = parser_feed(p->parser_te,c);
             if(r2->type == STRING_CMP_EQ){
@@ -170,16 +202,208 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
         }
         break;
       case HTTP_S_EVENT_END:  // move to following stage
-        p->stage = STAGE_DNS;
-        p->status = DNS_MESSAGE;
+        if(p->is_validContentType){
+          p->stage = STAGE_DNS;
+          p->status_http = DNS_MESSAGE;
+          if(p->is_chunked == 0 && p->contentLength == 0){
+            p->is_connectionClose = 1;
+          }
+        }else{
+          p->stage = STAGE_ERROR;
+          p->status_http = HTTP_INVALID_CT;
+        }
         break;
     }
   }else if(p->stage == STAGE_DNS){
-    p->status = DOH_FINISHED;
-    p->stage = STAGE_END;
+
+    // trabajando sobre stage dns, chunked no existe (por ahora)
+    if(p->contentLength || p->is_connectionClose){
+      if(p->dnsIndex<12){
+        p->status_dns = DNS_HEADER;
+
+        switch (p->dnsIndex) {
+          case 11:  // la cantidad de Adiditional RRs
+          case 10:
+            break;
+          case 9: // la cantidad de NS RRs
+          case 8:
+            break;
+          case 7: // la cantidad de Answer RRs
+            p->dnsAnswers*=0x10;
+          case 6:
+            p->dnsAnswers += c;
+            break;
+          case 5: // cantidad de Question RRs
+            p->dnsQuestions*=0x10;
+          case 4:
+            p->dnsQuestions += c;
+            break;
+          case 3: // flags, importa el 1ro y los 4 ultimos
+            if((c & 0x0E) != 0x00){
+              p->stage = STAGE_ERROR;
+              perror("Reply code not 0x0: \n");
+            }
+            break;
+          case 2:
+            break;
+          case 1: // el id, lo ignoro
+          case 0:
+            break;
+        }
+      }else{
+        switch (p->status_dns) {
+          case DNS_HEADER:
+            p->status_dns = DNS_QUESTION_NAME;
+          case DNS_QUESTION_NAME:
+            if(c == 0x00){
+              p->status_dns = DNS_QUESTION_TYPE_AND_CLASS;
+              p->prev_dnsIndex = p->dnsIndex;
+            }
+            break;
+          case DNS_QUESTION_TYPE_AND_CLASS:
+            if(p->dnsIndex-p->prev_dnsIndex >= 4){
+              if(p->dnsAnswers>0){
+                p->status_dns = DNS_ANSWER_NAME;
+                p->prev_dnsIndex = p->dnsIndex+1;
+              }else{
+                // no answers
+                p->status_http = DOH_FINISHED;
+                p->stage = STAGE_END;
+              }
+            }
+            break;
+          case DNS_ANSWER_NAME:
+
+            // reseteo el response type
+            p->dnsResponseType = 0;
+            p->dnsRDLength = 0;
+            p->dnsRDATA = 0;
+
+            // actualizo el current
+            if(p->addrInfo_root==NULL){
+              p->addrInfo_root = malloc(sizeof(*(p->addrInfo_root)));
+              memset(p->addrInfo_root,0,sizeof(*(p->addrInfo_root)));
+              p->addrInfo_root->ai_addr = malloc(sizeof(struct sockaddr_in*));
+              p->addrInfo_curr = p->addrInfo_root;
+              memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_in*));
+              p->addrInfo_curr->ai_addrlen = 16;
+            }
+
+            if(p->prev_dnsIndex == p->dnsIndex){
+              // primera vez, tengo que revisar si soy con memoria o si tengo que leer
+              if((c&0xc0) == 0xc0){
+                // tengo el puntero
+                p->prev_dnsIndex = 0;
+              }else if((c&0xc0) == 0x00){
+                // tengo que leer, la posición del prev indica si leer o no
+                p->prev_dnsIndex = p->dnsIndex;
+              }else{
+                //error
+                perror("dns packet has invalid format\n");
+                p->stage=STAGE_ERROR;
+              }
+            }else{
+              // segunda vez entrando.
+              //  CASO puntero: el prev_dnsIndex == 0
+              //  CASO nombre: queda el 0x00 como ultimo octeto
+              if(p->prev_dnsIndex==0 || c == 0x00){
+                p->status_dns = DNS_ANSWER_TYPE_AND_CLASS;
+                p->prev_dnsIndex = p->dnsIndex+1;
+              }
+            }
+            break;
+
+          case DNS_ANSWER_TYPE_AND_CLASS:
+            switch (p->dnsIndex-p->prev_dnsIndex) {
+              case 3: // class
+                p->status_dns = DNS_TTL;
+                p->prev_dnsIndex = p->dnsIndex;
+                // dns response type esta definido
+                switch (p->dnsResponseType) {
+                  case 0x0001:  // ipv4
+                    p->addrInfo_curr->ai_addr->sa_family = AF_INET;
+                    p->addrInfo_curr->ai_family = AF_INET;
+                    break;
+                  case 0x001c:  // ipv6
+                  p->addrInfo_curr->ai_addr->sa_family = AF_INET6;
+                    p->addrInfo_curr->ai_family = AF_INET6;
+                    break;
+                  default:
+                    p->addrInfo_curr->ai_family = AF_UNSPEC;
+                }
+              case 2:
+                break;
+              case 1: //type
+                p->dnsResponseType *= 0x10;
+              case 0:
+                p->dnsResponseType += c;
+                break;
+            }
+            break;
+          case DNS_TTL:
+            if(p->dnsIndex-p->prev_dnsIndex >= 4){
+              p->prev_dnsIndex = p->dnsIndex+1;
+              p->status_dns = DNS_RDLENGTH;
+            }
+            break;
+          case DNS_RDLENGTH:
+            switch (p->dnsIndex-p->prev_dnsIndex){
+              case 1:
+                p->status_dns = DNS_RDATA;
+                p->prev_dnsIndex = p->dnsIndex+1;
+                p->dnsRDLength *= 0x10;
+              case 0:
+                p->dnsRDLength += c;
+                break;
+            }
+            break;
+          case DNS_RDATA:
+            if(p->dnsIndex-p->prev_dnsIndex < p->dnsRDLength){
+              p->addrInfo_curr->ai_addr->sa_data[2+p->dnsRDATA++] = c;
+              if(p->dnsIndex-p->prev_dnsIndex == p->dnsRDLength-1){
+                p->status_dns = DNS_FINISHED_AN_ANSWER; // quiero ir al siguiente case
+              }
+            }
+          case DNS_FINISHED_AN_ANSWER:
+            if(p->status_dns == DNS_FINISHED_AN_ANSWER){
+
+              // para validar que realmente debo estar aqui, tiene que ver con el caso anterior
+              // armar el struct
+              if(--p->dnsAnswers>0){
+                p->prev_dnsIndex = p->dnsIndex+1;
+                p->status_dns = DNS_ANSWER_NAME;
+              }else{
+                p->status_dns = DNS_FINISHED;
+                p->status_http = DOH_FINISHED;
+                p->stage = STAGE_END;
+              }
+
+              // nuevo current
+              p->addrInfo_curr->ai_next = malloc(sizeof(*(p->addrInfo_curr)));
+              p->addrInfo_curr = p->addrInfo_curr->ai_next;
+              memset(p->addrInfo_curr,0,sizeof(*(p->addrInfo_curr)));
+              p->addrInfo_curr->ai_addr = malloc(sizeof(struct sockaddr_in*));
+              memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_in*));
+              p->addrInfo_curr->ai_addrlen = 16;
+
+            }
+            break;
+        }
+      }
+
+      // para avanzar el index
+      p->dnsIndex++;
+      p->contentLength--;
+    }else if(p->is_chunked){
+      // hacer el parseo de chunked
+    }else{
+      // termine
+      p->status_http = DOH_FINISHED;
+      p->stage = STAGE_END;
+    }
   }
 
-  return p->status;
+  return p->stage;
 }
 
 unsigned
@@ -187,10 +411,14 @@ parser_doh_getStatusCode(struct parser_doh *p){
   return p->statusCode;
 }
 
-int
-parser_doh_getAddrInfo(struct parser_doh *p, struct addrinfo **res){
-  // todo
-  return 0;
+struct addrinfo *
+parser_doh_getAddrInfo(struct parser_doh *p, int *err){
+  if(p->stage == STAGE_END){
+    *err = 0;
+  }else{
+    *err = 0;
+  }
+  return p->addrInfo_root;
 }
 
 int

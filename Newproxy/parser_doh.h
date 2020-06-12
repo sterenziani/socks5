@@ -22,18 +22,36 @@
 
 // stage actual
 enum doh_stage {
+    STAGE_ERROR,
     STAGE_HTTP,
     STAGE_DNS,
-    STAGE_ERROR,
     STAGE_END
 };
 
-enum doh_staus{
+enum doh_status{
     HTTP_PARSED_CODE,
     HTTP_HEADER,
     HTTP_INVALID_CODE,
+    HTTP_INVALID_CT,
+    HTTP_PARSING_CL,
+    HTTP_CHUNK_NUM,
+    HTTP_CHUNK_CR,
     DNS_MESSAGE,
+    DNS_ERROR,
     DOH_FINISHED
+};
+
+enum dns_status{
+    DNS_HEADER,
+    DNS_QUESTION_NAME,
+    DNS_QUESTION_TYPE_AND_CLASS,
+    DNS_ANSWER_NAME,
+    DNS_ANSWER_TYPE_AND_CLASS,
+    DNS_TTL,
+    DNS_RDLENGTH,
+    DNS_RDATA,
+    DNS_FINISHED_AN_ANSWER,
+    DNS_FINISHED
 };
 
 // funciones relacionadas para parsear el doh
@@ -56,9 +74,13 @@ parser_doh_getStatusCode(struct parser_doh *p);
 
 int
 parser_doh_isValidContentType(struct parser_doh *p);
-
+/*
 int
 parser_doh_getAddrInfo(struct parser_doh *p, struct addrinfo **res);
+*/
+
+struct addrinfo *
+parser_doh_getAddrInfo(struct parser_doh *p, int *err);
 
 // get del parser de transfer encoding
 struct parser_definition
