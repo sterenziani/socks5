@@ -5,7 +5,7 @@
 #include <string.h>
 #include <ctype.h>
 
-#include "parser.h"
+#include "../parser.h"
 
 // definición de maquina
 

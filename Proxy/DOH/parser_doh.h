@@ -9,8 +9,8 @@
 #include <sys/socket.h>
 #include <netdb.h>
 
-#include "parser.h"
-#include "parser_utils.h"
+#include "../parser.h"
+#include "../parser_utils.h"
 #include "parser_num.h"
 #include "parser_http.h"
 

@@ -10,7 +10,7 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "buffer.h"
+#include "../buffer.h"
 #include "doh.h"
 
 #define TIMEOUT_SEC 5
@@ -35,7 +35,6 @@ int main(int argc, char *argv[])
 
 void test_returns(void){
   struct addrinfo *res_doh;
-  struct addrinfo *res_dns;
   int sockfd;
 
   size_t result = solveDomain(HOST,DNS_TYPE,&res_doh);
@@ -50,6 +49,7 @@ void test_returns(void){
 
   // dejando getaddrinfo para la forma tradicional
   /*
+  struct addrinfo *res_dns;
   struct addrinfo hints;
   hints.ai_family = AF_INET;
   hints.ai_socktype = SOCK_STREAM;

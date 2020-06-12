@@ -5,8 +5,8 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include "buffer.h"
-#include "parser.h"
+#include "../buffer.h"
+#include "../parser.h"
 #include "parser_num.h"
 #include "parser_doh.h"
 #include "parser_http.h"

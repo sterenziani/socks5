@@ -5,8 +5,9 @@
 # Variables para compilador C
 CC=gcc
 CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
-DIR=NewProxy
-DEPS=$(DIR)/buffer.h $(DIR)/doh.h $(DIR)/parser.h $(DIR)/parser_num.h $(DIR)/parser_http.h $(DIR)/parser_doh.h $(DIR)/parser_utils.h
+DIR=Proxy
+DOH_DIR=$(DIR)/DOH
+DEPS=$(DIR)/buffer.h $(DIR)/parser.h $(DIR)/parser_utils.h $(DOH_DIR)/doh.h $(DOH_DIR)/parser_num.h $(DOH_DIR)/parser_http.h $(DOH_DIR)/parser_doh.h
 OBJ=$(DEPS:.h=.o)
 TESTS=doh_test parser_test
 
@@ -36,7 +37,7 @@ doh-start: doh-stop
 
 # Tests
 %_test: $(OBJ)
-	$(CC) -c -o $@.o $(CCFLAGS) $(DIR)/$@.c
+	$(CC) -c -o $@.o $(CCFLAGS) $(DOH_DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CCFLAGS)
 	rm -rf $@.o
 

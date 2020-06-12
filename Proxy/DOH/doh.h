@@ -20,7 +20,7 @@
 #include <arpa/inet.h>
 #include <netinet/in.h>
 
-#include "buffer.h"
+#include "../buffer.h"
 #include "doh.h"
 #include "parser_doh.h"
 

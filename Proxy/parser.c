@@ -5,22 +5,6 @@
 
 #include "parser.h"
 
-/* CDT del parser */
-struct parser {
-    /** tipificación para cada caracter */
-    const unsigned     *classes;
-    /** definición de estados */
-    const struct parser_definition *def;
-
-    /* estado actual */
-    unsigned            state;
-
-    /* evento que se retorna */
-    struct parser_event e1;
-    /* evento que se retorna */
-    struct parser_event e2;
-};
-
 void
 parser_destroy(struct parser *p) {
     if(p != NULL) {
@@ -41,13 +25,11 @@ parser_init(const unsigned *classes,
     return ret;
 }
 
-void
-parser_reset(struct parser *p) {
+void parser_reset(struct parser *p) {
     p->state   = p->def->start_state;
 }
 
-const struct parser_event *
-parser_feed(struct parser *p, const uint8_t c) {
+const struct parser_event * parser_feed(struct parser *p, const uint8_t c) {
     const unsigned type = p->classes[c];
 
     p->e1.next = p->e2.next = 0;
@@ -60,7 +42,7 @@ parser_feed(struct parser *p, const uint8_t c) {
         const int when = state[i].when;
         if (state[i].when <= 0xFF) {
             matched = (c == when);
-        } else if(state[i].when == ANY) {
+        } else if((unsigned int) state[i].when == ANY) {
             matched = true;
         } else if(state[i].when > 0xFF) {
             matched = (type & when);
@@ -88,4 +70,3 @@ const unsigned *
 parser_no_classes(void) {
     return classes;
 }
-
