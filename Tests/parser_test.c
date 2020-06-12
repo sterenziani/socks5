@@ -5,11 +5,11 @@
 #include <string.h>
 #include <sys/types.h>
 
-#include "../buffer.h"
-#include "../parser.h"
-#include "parser_num.h"
-#include "parser_doh.h"
-#include "parser_http.h"
+#include "../Proxy/buffer.h"
+#include "../Proxy/parser.h"
+#include "../Proxy/DOH/parser_num.h"
+#include "../Proxy/DOH/parser_doh.h"
+#include "../Proxy/DOH/parser_http.h"
 
 #define TEST_BUFFER_SIZE 256
 

@@ -10,8 +10,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <sys/socket.h>
-#include "../buffer.h"
-#include "doh.h"
+
+#include "../Proxy/buffer.h"
+#include "../Proxy/DOH/doh.h"
 
 #define TIMEOUT_SEC 5
 

@@ -7,9 +7,9 @@ CC=gcc
 CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
 DOH_DIR=$(DIR)/DOH
+TEST_DIR=Tests
 DEPS=$(DIR)/buffer.h $(DIR)/parser.h $(DIR)/parser_utils.h $(DOH_DIR)/doh.h $(DOH_DIR)/parser_num.h $(DOH_DIR)/parser_http.h $(DOH_DIR)/parser_doh.h
 OBJ=$(DEPS:.h=.o)
-TESTS=doh_test parser_test
 
 # Variables para doh Server
 ## Al modificar el puerto, recordar tambien modificar dicho valor en Proxy/doh.c
@@ -36,16 +36,11 @@ doh-start: doh-stop
 	$(CC) -c -o $@ $< $(CCFLAGS)
 
 # Tests
-%_test: $(OBJ)
-	$(CC) -c -o $@.o $(CCFLAGS) $(DOH_DIR)/$@.c
+$(TEST_DIR)/%_test: $(OBJ)
+	$(CC) -c -o $@.o $(CCFLAGS) $@.c
 	$(CC) -o $@ $^ $@.o $(CCFLAGS)
 	rm -rf $@.o
 
-.PHONY: tests
-tests: $(TESTS)
-	time ./doh_test
-	time ./parser_test
-
 .PHONY: clean
 clean:
-	rm -rf $(DIR)/*.o $(DIR)/*.out $(DIR)/*.dSYM *.o *.bin *.out *_test
+	rm -rf $(DIR)/*.o $(DIR)/*.out $(DIR)/*.dSYM *.o *.bin *.out $(TEST_DIR)/*_test
