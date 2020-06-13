@@ -422,12 +422,12 @@ static unsigned request_write(struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     unsigned ret = COPY;
     size_t  count;
+    bool resolved;
 
     if(sock->origin_addr_storage.ss_family == AF_INET)
     {
       // Resolves name is IPv4
-      for(int i=0; i<14; i++)
-        printf("%hhu.", ((const struct sockaddr *) &sock->origin_addr_storage)->sa_data[i]);
+      resolved = true;
       if(request_marshall(d->wb, ipv4, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data+2, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data, 4) < 10) {
         abort();
       }
@@ -435,12 +435,17 @@ static unsigned request_write(struct selector_key *key) {
     else if(sock->origin_addr_storage.ss_family == AF_INET6)
     {
       // Resolved name is IPv6
+      resolved = true;
     }
-    else if(request_marshall(d->wb, d->parser.address_type, d->parser.address, d->parser.port, d->parser.addr_ptr) < 10) {
-      // Name didn't have to be resolved
-      abort();
+    else
+    {
+      resolved = false;
+      if(request_marshall(d->wb, d->parser.address_type, d->parser.address, d->parser.port, d->parser.addr_ptr) < 10)
+      {
+        // Name didn't have to be resolved
+        abort();
+      }
     }
-
     uint8_t *ptr = buffer_read_ptr(d->wb, &count);
     if(count < 10) {
       abort();
@@ -450,13 +455,23 @@ static unsigned request_write(struct selector_key *key) {
       abort();
     }
 
-    if(n > 0) {
-      buffer_read_adv(d->wb, n);
-      if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->client_fd, OP_READ)){
-        ret = ERROR;
+    if(resolved){
+      if(n > 0) {
+        buffer_read_adv(d->wb, n);
+        if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->client_fd, OP_READ)){
+          ret = ERROR;
+        }
+        if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->origin_fd, OP_READ)){
+          ret = ERROR;
+        }
       }
-      if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->origin_fd, OP_READ)){
-        ret = ERROR;
+    }
+    else{
+      if(n > 0) {
+        buffer_read_adv(d->wb, n);
+        if(SELECTOR_SUCCESS != selector_set_interest_key(key, OP_READ)){
+          ret = ERROR;
+        }
       }
     }
 
@@ -506,7 +521,6 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
             sock->origin_port = htons(p);
             address.sin_addr.s_addr = inet_addr(ip);
             address.sin_port = htons(p);
-            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
 
             if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) == -1){
               if(errno == EINPROGRESS) {
@@ -520,15 +534,40 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
                 }
               }
             }
+            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
         }
         else if(d->parser.address_type == domain)
         {
-          fprintf(stdout, "Eso es un domain. Vamos a resolverlo!\n");
           ret = REQUEST_RESOLVE;
         }
         else if(d->parser.address_type == ipv6)
         {
-          fprintf(stdout, "Eso es una IPv6. No implementado!\n");
+          char ip[40];
+          snprintf(ip, 40, "%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x:%02x%02x",
+                            d->parser.address[0], d->parser.address[1], d->parser.address[2], d->parser.address[3], d->parser.address[4], d->parser.address[5], d->parser.address[6], d->parser.address[7],
+                            d->parser.address[8], d->parser.address[9], d->parser.address[10], d->parser.address[11], d->parser.address[12], d->parser.address[13], d->parser.address[14], d->parser.address[15]);
+
+          struct sockaddr_in6 address;
+          memset(&address, 0, sizeof(address));
+          address.sin6_family = AF_INET6;
+          sock->origin_fd = socket(AF_INET6, SOCK_STREAM, 0);
+          sock->origin_port = htons(p);
+          inet_pton(AF_INET6, ip, &address.sin6_addr.s6_addr);
+          address.sin6_port = htons(p);
+
+          if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) == -1){
+            if(errno == EINPROGRESS) {
+              selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+              if(SELECTOR_SUCCESS != st) {
+                return ERROR;
+              }
+              st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
+              if(SELECTOR_SUCCESS != st) {
+                return ERROR;
+              }
+            }
+          }
+          fprintf(stdout, "New connection, %d-%d (IP : %s, port : %d)\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port));
         }
         break;
       case req_bind:

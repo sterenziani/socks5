@@ -66,7 +66,7 @@ request_parser_feed(struct request_parser *p, const uint8_t b) {
         		}
         		else if(p->address_type == ipv6) {
                     p->address[0] = b;
-        			p->remaining = 7;
+        			p->remaining = 15;
         			p->addr_ptr = 1;
         		}
         		else if(p->address_type == domain) {
@@ -129,7 +129,7 @@ request_parser_feed(struct request_parser *p, const uint8_t b) {
     return p->state;
 }
 
-extern bool 
+extern bool
 request_is_done(const enum request_state state, bool *errored) {
     bool ret;
     switch (state) {
@@ -202,7 +202,7 @@ request_error(const struct request_parser *p) {
     return ret;
 }
 
-extern void 
+extern void
 request_parser_close(struct request_parser *p) {
 	free(p->address);
 }
@@ -221,7 +221,7 @@ request_consume(buffer *b, struct request_parser *p, bool *errored) {
 }
 
 extern int
-request_marshall(buffer *b, const uint8_t atyp, 
+request_marshall(buffer *b, const uint8_t atyp,
     const uint8_t address[], const uint8_t port[], const uint8_t len) {
     size_t n;
     size_t i = 0;
