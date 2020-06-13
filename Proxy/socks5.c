@@ -1,7 +1,7 @@
 /**
  * socks5nio.c  - controla el flujo de un proxy SOCKSv5 (sockets no bloqueantes)
  */
-#include<stdio.h>
+#include <stdio.h>
 #include <stdlib.h>  // malloc
 #include <string.h>  // memset
 #include <assert.h>  // assert
@@ -20,7 +20,7 @@
 
 #include "stm.h"
 #include "socks5.h"
-#include"netutils.h"
+#include "netutils.h"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
@@ -66,6 +66,7 @@ enum socks_v5state {
      */
 
     REQUEST_READ,
+    REQUEST_RESOLVE,
 
     /**
      * envía la respuesta del request al cliente.
@@ -135,7 +136,7 @@ struct socks5 {
     union {
         struct hello_st           hello;
         struct request_st         request;
-        struct copy_st               copy;
+        struct copy_st            copy;
     } client;
     /** estados para el origin_fd */
     union {
@@ -147,7 +148,15 @@ struct socks5 {
     socklen_t client_addr_len;
     int client_fd;
     int origin_fd;
+
+    // ORIGIN
     struct addrinfo* origin_resolution;
+    struct addrinfo* origin_resolution_current;
+    char origin_addr[255];
+    int origin_port;
+    int origin_domain;
+    socklen_t origin_addr_length;
+    struct sockaddr_storage origin_addr_storage;
 
     uint8_t raw_buff_a[2048];
     uint8_t raw_buff_b[2048];
@@ -183,7 +192,6 @@ static struct socks5* socks5_new(int fd)
       goto finally;
   }
   memset(ret, 0x00, sizeof(*ret));
-
   ret->client_fd = fd;
   buffer_init(&ret->client_read_buffer, N(ret->raw_buff_a), ret->raw_buff_a);
   buffer_init(&ret->client_write_buffer, N(ret->raw_buff_b), ret->raw_buff_b);
@@ -411,11 +419,25 @@ static void request_write_init(const unsigned state, struct selector_key *key) {
 
 static unsigned request_write(struct selector_key *key) {
     struct request_st *d = &ATTACHMENT(key)->client.request;
+    struct socks5 *sock = ATTACHMENT(key);
     unsigned ret = COPY;
     size_t  count;
 
-    if(request_marshall(d->wb, d->parser.address_type,
-      d->parser.address, d->parser.port, d->parser.addr_ptr) < 10) {
+    if(sock->origin_addr_storage.ss_family == AF_INET)
+    {
+      // Resolves name is IPv4
+      for(int i=0; i<14; i++)
+        printf("%hhu.", ((const struct sockaddr *) &sock->origin_addr_storage)->sa_data[i]);
+      if(request_marshall(d->wb, ipv4, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data+2, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data, 4) < 10) {
+        abort();
+      }
+    }
+    else if(sock->origin_addr_storage.ss_family == AF_INET6)
+    {
+      // Resolved name is IPv6
+    }
+    else if(request_marshall(d->wb, d->parser.address_type, d->parser.address, d->parser.port, d->parser.addr_ptr) < 10) {
+      // Name didn't have to be resolved
       abort();
     }
 
@@ -423,15 +445,17 @@ static unsigned request_write(struct selector_key *key) {
     if(count < 10) {
       abort();
     }
-
-    size_t n = send(key->fd, ptr, count, MSG_DONTWAIT);
+    size_t n = send(sock->client_fd, ptr, count, MSG_DONTWAIT);
     if(n < 10) {
       abort();
     }
 
     if(n > 0) {
       buffer_read_adv(d->wb, n);
-      if(SELECTOR_SUCCESS != selector_set_interest_key(key, OP_READ)) {
+      if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->client_fd, OP_READ)){
+        ret = ERROR;
+      }
+      if(SELECTOR_SUCCESS != selector_set_interest(key->s, sock->origin_fd, OP_READ)){
         ret = ERROR;
       }
     }
@@ -439,12 +463,37 @@ static unsigned request_write(struct selector_key *key) {
     return ret;
 }
 
+static void * request_resolve(void *data){
+    struct selector_key *key = (struct selector_key *) data;
+    struct socks5* sock = ATTACHMENT(key);
+    // Liberá todos los recursos cuando termines el thread
+    pthread_detach(pthread_self());
+    sock->origin_resolution = 0;
+    struct addrinfo hints = {
+        .ai_family    = AF_UNSPEC,    /* Allow IPv4 or IPv6 */
+        .ai_socktype  = SOCK_STREAM,  /* Datagram socket */
+        .ai_flags     = AI_PASSIVE,   /* For wildcard IP address */
+        .ai_protocol  = 0,            /* Any protocol */
+        .ai_canonname = NULL,
+        .ai_addr      = NULL,
+        .ai_next      = NULL,
+    };
+    char buff[7];
+    snprintf(buff, sizeof(buff), "%d", sock->origin_port);
+    getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+    sock->origin_resolution_current = sock->origin_resolution;
+    // Aviso que esta operación bloqueante ya terminó (como está en estado DNS_RESOLV, ejecuta el handler request_resolv_done)
+    selector_notify_block(key->s, key->fd);
+    free(data);
+    return 0;
+}
 
 static unsigned request_process(const struct request_st* d, struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     unsigned ret = REQUEST_WRITE;
     uint8_t port[2] = {d->parser.port[0], d->parser.port[1]};
     unsigned short int p = ntohs(*((unsigned short int*)port));
+    sock->origin_port = p;
     switch(d->parser.command){
       case req_connect:
         if(d->parser.address_type == ipv4){
@@ -454,6 +503,7 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
             memset(&address, 0, sizeof(address));
             address.sin_family = AF_INET;
             sock->origin_fd = socket(AF_INET, SOCK_STREAM, 0);
+            sock->origin_port = htons(p);
             address.sin_addr.s_addr = inet_addr(ip);
             address.sin_port = htons(p);
             fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
@@ -473,7 +523,8 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
         }
         else if(d->parser.address_type == domain)
         {
-          fprintf(stdout, "Eso es un domain. No implementado!\n");
+          fprintf(stdout, "Eso es un domain. Vamos a resolverlo!\n");
+          ret = REQUEST_RESOLVE;
         }
         else if(d->parser.address_type == ipv6)
         {
@@ -484,7 +535,6 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
         break;
       case req_udp_associate:
         break;
-
     }
     return ret;
 }
@@ -518,6 +568,87 @@ static unsigned request_read(struct selector_key *key) {
         ret = ERROR;
     }
     return error ? ERROR : ret;
+}
+
+static void request_resolve_init(const unsigned state, struct selector_key *key){
+  struct socks5 *sock = ATTACHMENT(key);
+  struct request_st *d = &ATTACHMENT(key)->client.request;
+  struct selector_key *dns_key = malloc(sizeof(*dns_key));
+  if (dns_key == NULL) {
+    selector_unregister_fd(key->s, sock->client_fd);
+    abort();
+  }
+  dns_key->s    = key->s;
+  dns_key->fd   = sock->client_fd;
+  dns_key->data = sock;
+
+  memcpy(sock->origin_addr, d->parser.address, &(d->parser.addr_ptr)-(d->parser.address));
+  pthread_t tid;
+  // En otro thread, resolvé el nombre
+  if (-1 == pthread_create(&tid, 0, request_resolve, dns_key))
+  {
+    // no se logro crear el nuevo hilo
+    fprintf(stdout, "Error when creating new thread!\n");
+    selector_unregister_fd(key->s, sock->client_fd);
+    free(dns_key);
+    abort();
+  }
+  sleep(1);
+}
+
+static unsigned request_connect(struct selector_key *key, struct socks5* sock)
+{
+  sock->origin_fd = socket(sock->origin_domain, SOCK_STREAM, 0);
+  if (sock->origin_fd == -1) {
+    goto finally;
+  }
+  if (selector_fd_set_nio(sock->origin_fd) == -1) {
+    goto finally;
+  }
+  if (-1 == connect(sock->origin_fd, (const struct sockaddr *) &sock->origin_addr_storage, sock->origin_addr_length))
+  {
+    if(errno == EINPROGRESS) {
+      selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+      if(SELECTOR_SUCCESS != st) {
+        goto finally;
+      }
+      st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
+      if(SELECTOR_SUCCESS != st) {
+        goto finally;
+      }
+      sock->references += 1;
+    }
+  } else {
+    fprintf(stdout, "ERROR!\n");
+    abort();
+  }
+  fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port);
+
+  return REQUEST_WRITE;
+
+  finally:
+    fprintf(stdout, "Error. Couldn't connect %d to their requested origin server\n", sock->client_fd);
+    freeaddrinfo(sock->origin_resolution);
+    sock->origin_resolution = 0;
+    return ERROR;
+}
+
+static unsigned request_resolve_done(struct selector_key *key) {
+    struct socks5 *sock = ATTACHMENT(key);
+    if(sock->origin_resolution_current == NULL)
+    {
+      fprintf(stdout, "Unable to connect client %d to requested origin server", sock->client_fd);
+      freeaddrinfo(sock->origin_resolution);
+      sock->origin_resolution = 0;
+      return ERROR;
+    }
+    else
+    {
+      sock->origin_domain = sock->origin_resolution_current->ai_family;
+      sock->origin_addr_length = sock->origin_resolution_current->ai_addrlen;
+      memcpy(&sock->origin_addr_storage, sock->origin_resolution_current->ai_addr, sock->origin_resolution_current->ai_addrlen);
+    }
+    return request_connect(key, sock);
 }
 
 
@@ -670,10 +801,10 @@ static unsigned copy_write(struct selector_key *key) {
 /** definición de handlers para cada estado */
 static const struct state_definition client_statbl[] = {
     {
-        .state            = HELLO_READ,
-        .on_arrival       = hello_read_init,
-        .on_departure     = hello_read_close,
-        .on_read_ready    = hello_read,
+      .state            = HELLO_READ,
+      .on_arrival       = hello_read_init,
+      .on_departure     = hello_read_close,
+      .on_read_ready    = hello_read,
     },
     {
       .state            = HELLO_WRITE,
@@ -686,6 +817,11 @@ static const struct state_definition client_statbl[] = {
       .on_arrival       = request_read_init,
       .on_departure     = request_read_close,
       .on_read_ready    = request_read,
+    },
+    {
+      .state            = REQUEST_RESOLVE,
+      .on_arrival       = request_resolve_init,
+      .on_block_ready   = request_resolve_done,
     },
     {
       .state            = REQUEST_WRITE,
@@ -765,12 +901,12 @@ static void socksv5_done(struct selector_key* key) {
     };
     for(unsigned i = 0; i < N(fds); i++)
     {
-        if(fds[i] != -1) {
-            if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i]))
-            {
-                abort();
-            }
-            close(fds[i]);
+      if(fds[i] != -1) {
+        if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i]))
+        {
+          abort();
         }
+        close(fds[i]);
+      }
     }
 }
