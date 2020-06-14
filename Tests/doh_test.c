@@ -19,7 +19,7 @@
 //test variable
 #define HOST "itba.edu.ar"
 #define DNS_TYPE AF_INET
-#define PORT 80
+#define PORT "80"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define BUFFER_MAX 1024
@@ -35,18 +35,17 @@ int main(int argc, char *argv[])
 }
 
 void test_returns(void){
+  struct addrinfo hints;
   struct addrinfo *res_doh;
   int sockfd;
 
-  size_t result = solveDomain(HOST,DNS_TYPE,&res_doh);
+  memset(&hints, 0, sizeof hints);
+	hints.ai_family = DNS_TYPE;
+	hints.ai_socktype = SOCK_STREAM;
+
+  size_t result = solveDomain(HOST,PORT,&hints,&res_doh);
   assert(result==0);
   printf("doh_test/connect:\tsuccess!\n");
-
-  struct addrinfo *aux = res_doh;
-  while(aux!=NULL){
-    ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(PORT);
-    aux = aux->ai_next;
-  }
 
   // dejando getaddrinfo para la forma tradicional
   /*
@@ -63,7 +62,7 @@ void test_returns(void){
   //printf("%u\n",(unsigned) ((struct sockaddr_in*)res_doh->ai_next->ai_addr)->sin_addr.s_addr);
   //printf("%u\n",(unsigned) ((struct sockaddr_in*)res_dns->ai_next->ai_addr)->sin_addr.s_addr);
 
-  sockfd = socket(AF_INET,SOCK_STREAM,0);
+  sockfd = socket(res_doh->ai_family,res_doh->ai_socktype,0);
 
   assert(connect(sockfd,res_doh->ai_addr,res_doh->ai_addrlen) == 0);
   printf("doh_test/can_connect_to_returned_address:\tsuccess!\n");

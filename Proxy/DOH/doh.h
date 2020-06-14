@@ -42,7 +42,7 @@
 
 // resuelve el nombre
 size_t
-solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo);
+solveDomain(const char* host, const char* port, struct addrinfo *hints, struct addrinfo **ret_addrInfo);
 
 // funciones auxiliares
 
