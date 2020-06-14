@@ -10,18 +10,15 @@
 #include <sys/socket.h>
 #include <unistd.h>  // close
 #include <pthread.h>
-
 #include <arpa/inet.h>
 #include <netinet/in.h>
-
 #include "hello.h"
+#include "auth.h"
 #include "request.h"
 #include "buffer.h"
-
 #include "stm.h"
 #include "socks5.h"
 #include "netutils.h"
-
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 
@@ -65,6 +62,8 @@ enum socks_v5state {
      *   - ERROR       ante cualquier error (IO/parseo)
      */
 
+    AUTH_READ,
+    AUTH_WRITE,
     REQUEST_READ,
     REQUEST_RESOLVE,
 
@@ -101,6 +100,12 @@ struct hello_st {
     uint8_t               method;
 };
 
+struct auth_st {
+    /** buffer utilizado para I/O */
+    buffer               *rb, *wb;
+    struct auth_parser   parser;
+};
+
 struct request_st {
     /** buffer utilizado para I/O */
     buffer               *rb, *wb;
@@ -109,12 +114,6 @@ struct request_st {
 
 struct copy_st {
   buffer               *rb, *wb;
-  // Que puedo necesitar aca???
-};
-
-struct connecting_st {
-  int a;
-  // Que puedo necesitar aca???
 };
 
 //...
@@ -135,12 +134,12 @@ struct socks5 {
     /** estados para el client_fd */
     union {
         struct hello_st           hello;
+        struct auth_st            auth;
         struct request_st         request;
         struct copy_st            copy;
     } client;
     /** estados para el origin_fd */
     union {
-        struct connecting_st         conn;
         struct copy_st               copy;
     } orig;
 
@@ -287,7 +286,7 @@ void socksv5_passive_accept(struct selector_key *key) {
     if(SELECTOR_SUCCESS != selector_register(key->s, client, &socks5_handler, OP_READ, state)) {
         goto fail;
     }
-    return ;
+    return;
 fail:
     if(client != -1) {
         close(client);
@@ -306,6 +305,9 @@ static void on_hello_method(struct hello_parser *p, const uint8_t method) {
     if(SOCKS_HELLO_NOAUTHENTICATION_REQUIRED == method) {
        *selected = method;
     }
+    if(SOCKS_HELLO_USER_PASS_AUTHENTICATION == method) {
+       *selected = method;
+    }
 }
 
 /** inicializa las variables de los estados HELLO_... */
@@ -321,7 +323,6 @@ static void hello_write_init(const unsigned state, struct selector_key *key) {
     struct hello_st *d = &ATTACHMENT(key)->client.hello;
     d->rb                              = &(ATTACHMENT(key)->client_read_buffer);
     d->wb                              = &(ATTACHMENT(key)->client_write_buffer);
-
 }
 
 static unsigned hello_write(struct selector_key *key) {
@@ -329,6 +330,10 @@ static unsigned hello_write(struct selector_key *key) {
     unsigned ret = REQUEST_READ;
     size_t  count;
     uint8_t *ptr = buffer_read_ptr(d->wb, &count);
+    if(ptr[1] == SOCKS_HELLO_USER_PASS_AUTHENTICATION)
+    {
+      ret = AUTH_READ;
+    }
 
     if(count < 2) {
       ret = ERROR;
@@ -359,7 +364,6 @@ static unsigned hello_read(struct selector_key *key) {
      uint8_t *ptr;
       size_t  count;
      ssize_t  n;
-
     ptr = buffer_write_ptr(d->rb, &count);
     n = recv(key->fd, ptr, count, 0);
     if(n > 0) {
@@ -367,6 +371,7 @@ static unsigned hello_read(struct selector_key *key) {
         const enum hello_state st = hello_consume(d->rb, &d->parser, &error);
         if(hello_is_done(st, 0)) {
             if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+                d->method = *((uint8_t*) d->parser.data);
                 ret = hello_process(d);
             } else {
                 ret = ERROR;
@@ -383,7 +388,14 @@ static unsigned hello_process(const struct hello_st* d) {
     unsigned ret = HELLO_WRITE;
 
     uint8_t m = d->method;
-    const uint8_t r = (m == SOCKS_HELLO_NO_ACCEPTABLE_METHODS) ? 0xFF : 0x00;
+    uint8_t r;
+    if(m == SOCKS_HELLO_NO_ACCEPTABLE_METHODS)
+      r = METHOD_NO_ACCEPTABLE_METHODS;
+    else if(m == SOCKS_HELLO_USER_PASS_AUTHENTICATION)
+      r = METHOD_USER_PASS_AUTHENTICATION;
+    else
+      r = METHOD_NO_AUTHENTICATION_REQUIRED;
+
     if (-1 == hello_marshall(d->wb, r)) {
         ret  = ERROR;
     }
@@ -399,6 +411,88 @@ static void hello_read_close(const unsigned state, struct selector_key *key){
 static void hello_write_close(const unsigned state, struct selector_key *key){
 }
 
+////////////////////////////////////////////////////////////////////////////////
+// AUTH
+////////////////////////////////////////////////////////////////////////////////
+
+static void auth_read_init(const unsigned state, struct selector_key *key) {
+    struct auth_st *d = &ATTACHMENT(key)->client.auth;
+    d->rb                              = &(ATTACHMENT(key)->client_read_buffer);
+    d->wb                              = &(ATTACHMENT(key)->client_write_buffer);
+    auth_parser_init(&d->parser);
+}
+
+// Retorna 0 si el usuario y contraseña son validos. 1 si no lo son.
+int user_pass_valid(const char* u, const char* p)
+{
+  if(strcmp(u, "user") == 0 && strcmp(p, "pass") == 0)
+  {
+    return 0;
+  }
+  return 1;
+}
+
+static unsigned auth_process(const struct auth_st* d) {
+    unsigned ret = AUTH_WRITE;
+    uint8_t m = user_pass_valid(d->parser.username, d->parser.password);
+    if (-1 == auth_marshall(d->wb, m)) {
+        ret  = ERROR;
+    }
+    return ret;
+}
+
+static unsigned auth_read(struct selector_key *key) {
+  struct auth_st *d = &ATTACHMENT(key)->client.auth;
+  unsigned ret = AUTH_WRITE;
+  bool error = false;
+  uint8_t *ptr;
+  size_t  count;
+  ssize_t  n;
+  ptr = buffer_write_ptr(d->rb, &count);
+  n = recv(key->fd, ptr, count, 0);
+  if(n > 0) {
+      buffer_write_adv(d->rb, n);
+      const enum request_state st = auth_consume(d->rb, &d->parser, &error);
+      if(auth_is_done(st, 0)) {
+          if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+              ret = auth_process(d);
+          } else {
+              ret = ERROR;
+          }
+      }
+  } else {
+      ret = ERROR;
+  }
+  return error ? ERROR : ret;
+}
+
+static unsigned auth_write(struct selector_key *key) {
+  unsigned ret = REQUEST_READ;
+  struct auth_st *d = &ATTACHMENT(key)->client.auth;
+  size_t  count;
+  uint8_t *ptr = buffer_read_ptr(d->wb, &count);
+  if(ptr[1])
+  {
+    ret = ERROR;
+  }
+
+  if(count < 2) {
+    ret = ERROR;
+  }
+
+  size_t n = send(key->fd, ptr, count, MSG_DONTWAIT);
+  if(n != 2) {
+    ret = ERROR;
+  }
+
+  if(n > 0) {
+    buffer_read_adv(d->wb, n);
+    if(SELECTOR_SUCCESS != selector_set_interest_key(key, OP_READ)) {
+      ret = ERROR;
+    }
+  }
+  return ret;
+}
 
 ////////////////////////////////////////////////////////////////////////////////
 // REQUEST
@@ -852,6 +946,15 @@ static const struct state_definition client_statbl[] = {
       .on_write_ready   = hello_write,
     },
     {
+      .state            = AUTH_READ,
+      .on_arrival       = auth_read_init,
+      .on_read_ready    = auth_read,
+    },
+    {
+      .state            = AUTH_WRITE,
+      .on_write_ready   = auth_write,
+    },
+    {
       .state            = REQUEST_READ,
       .on_arrival       = request_read_init,
       .on_departure     = request_read_close,
@@ -873,7 +976,7 @@ static const struct state_definition client_statbl[] = {
       .on_arrival       = copy_init,
       .on_departure     = copy_close,
       .on_read_ready    = copy_read,
-      .on_write_ready    = copy_write,
+      .on_write_ready   = copy_write,
     },
     {
       .state            = DONE,
@@ -940,7 +1043,7 @@ static void socksv5_done(struct selector_key* key) {
     };
     for(unsigned i = 0; i < N(fds); i++)
     {
-      if(fds[i] != -1) {
+      if(fds[i] != -1 && fds[i] != 0) {
         if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i]))
         {
           abort();

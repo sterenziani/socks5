@@ -7,6 +7,7 @@
 #include "buffer.h"
 
 static const uint8_t METHOD_NO_AUTHENTICATION_REQUIRED = 0x00;
+static const uint8_t METHOD_USER_PASS_AUTHENTICATION   = 0x02;
 static const uint8_t METHOD_NO_ACCEPTABLE_METHODS      = 0xFF;
 
 /*
@@ -86,6 +87,7 @@ hello_error(const struct hello_parser *p);
 void hello_parser_close(struct hello_parser *p);
 
 static const uint8_t SOCKS_HELLO_NOAUTHENTICATION_REQUIRED = 0x00;
+static const uint8_t SOCKS_HELLO_USER_PASS_AUTHENTICATION  = 0x02;
 /*
  * If the selected METHOD is X'FF', none of the methods listed by the
    client are acceptable, and the client MUST close the connection.
