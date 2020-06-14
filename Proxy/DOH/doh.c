@@ -7,7 +7,7 @@
 
 // main function
 size_t
-solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo)
+solveDomain(const char* host, const char* port, struct addrinfo *hints, struct addrinfo **ret_addrInfo)
 {
   int sockfd;
   struct sockaddr_in server;
@@ -46,7 +46,7 @@ solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo)
   buffer *m = &message;
   uint8_t direct_buff_m[BUFFER_MAX];
   buffer_init(&message, N(direct_buff_m), direct_buff_m);
-  size_t contentLength = dnsEncode(host,dnsType,m,BUFFER_MAX);
+  size_t contentLength = dnsEncode(host,hints->ai_family,m,BUFFER_MAX);
   char contentLength_str[INT_STRING_MAX];
   snprintf(contentLength_str, sizeof contentLength_str, "%zu", contentLength);
 
@@ -150,6 +150,23 @@ solveDomain(const char* host, int dnsType, struct addrinfo **ret_addrInfo)
 
   int err;
   *ret_addrInfo = parser_doh_getAddrInfo(myDohParser, &err);
+
+  if(err==0){
+
+    uint32_t port_number = 0;
+
+    for(int i=0; port[i]!=0; i++){
+      port_number = port_number*10+(port[i]-'0');
+    }
+
+    struct addrinfo *aux = *ret_addrInfo;
+    while(aux!=NULL){
+      ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(port_number);
+      aux->ai_socktype = hints->ai_socktype;
+      aux = aux->ai_next;
+    }
+  }
+
   parser_doh_destroy(myDohParser);
   shutdown(sockfd, SHUT_RDWR);
 

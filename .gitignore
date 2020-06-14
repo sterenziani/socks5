@@ -2,6 +2,9 @@
 # Gitignore extraido desde C.gitignore
 # disponible en https://github.com/github/gitignore
 
+# Test files
+*_test
+
 # Prerequisites
 *.d
 
