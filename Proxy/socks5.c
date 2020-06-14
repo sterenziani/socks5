@@ -169,11 +169,12 @@ struct socks5 {
 
     unsigned references;
     struct socks5* next;
+    bool active;
 };
 
-static const unsigned max_pool = 50; // tamaño máximo
-static unsigned pool_size = 0;  // tamaño actual
-static struct socks5* pool = 0;  // pool propiamente dicho
+static const unsigned max_pool = 50;
+static unsigned pool_size = 0;
+static struct socks5* pool = 0;
 
 static const struct state_definition* socks5_describe_states(void);
 
@@ -201,6 +202,7 @@ static struct socks5* socks5_new(int fd)
   ret->stm.states = socks5_describe_states();
   stm_init(&ret->stm);
   ret->references = 1;
+  ret->active = true;
 
 finally:
   return ret;
@@ -225,9 +227,13 @@ static void socks5_destroy(struct socks5* s) {
     } else if(s->references == 1) {
         if(s != NULL) {
             if(pool_size < max_pool) {
+              if(s->active)
+              {
+                s->active = false;
                 s->next = pool;
                 pool = s;
                 pool_size++;
+              }
             } else {
                 socks5_destroy_(s);
             }
@@ -291,6 +297,7 @@ fail:
     if(client != -1) {
         close(client);
     }
+    fprintf(stdout, "What am I doing here?\n");
     socks5_destroy(state);
 }
 
@@ -422,19 +429,9 @@ static void auth_read_init(const unsigned state, struct selector_key *key) {
     auth_parser_init(&d->parser);
 }
 
-// Retorna 0 si el usuario y contraseña son validos. 1 si no lo son.
-int user_pass_valid(const char* u, const char* p)
-{
-  if(strcmp(u, "user") == 0 && strcmp(p, "pass") == 0)
-  {
-    return 0;
-  }
-  return 1;
-}
-
 static unsigned auth_process(const struct auth_st* d) {
     unsigned ret = AUTH_WRITE;
-    uint8_t m = user_pass_valid(d->parser.username, d->parser.password);
+    uint8_t m = user_pass_valid(d->parser.username, d->parser.ulen, d->parser.password, d->parser.plen);
     if (-1 == auth_marshall(d->wb, m)) {
         ret  = ERROR;
     }
@@ -579,10 +576,10 @@ static void * request_resolve(void *data){
     pthread_detach(pthread_self());
     sock->origin_resolution = 0;
     struct addrinfo hints = {
-        .ai_family    = AF_UNSPEC,    /* Allow IPv4 or IPv6 */
-        .ai_socktype  = SOCK_STREAM,  /* Datagram socket */
-        .ai_flags     = AI_PASSIVE,   /* For wildcard IP address */
-        .ai_protocol  = 0,            /* Any protocol */
+        .ai_family    = AF_UNSPEC,
+        .ai_socktype  = SOCK_STREAM,
+        .ai_flags     = AI_PASSIVE,
+        .ai_protocol  = 0,
         .ai_canonname = NULL,
         .ai_addr      = NULL,
         .ai_next      = NULL,
@@ -591,7 +588,6 @@ static void * request_resolve(void *data){
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
     getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     sock->origin_resolution_current = sock->origin_resolution;
-    // Aviso que esta operación bloqueante ya terminó (como está en estado DNS_RESOLV, ejecuta el handler request_resolv_done)
     selector_notify_block(key->s, key->fd);
     free(data);
     return 0;
@@ -1032,6 +1028,7 @@ static void socksv5_block(struct selector_key *key) {
 }
 
 static void socksv5_close(struct selector_key *key) {
+    fprintf(stdout, "Estoy en socksv5_close\n");
     socks5_destroy(ATTACHMENT(key));
 }
 
