@@ -26,6 +26,10 @@
 
 #define MAX_CLIENTS 1024
 
+int total_connections;
+int active_connections;
+unsigned long transferred_bytes;
+
 static bool done = false;
 
 static void sigterm_handler(const int signal) {
@@ -34,6 +38,9 @@ static void sigterm_handler(const int signal) {
 }
 
 int main(const int argc, const char **argv) {
+    total_connections = 0;
+    active_connections = 0;
+    transferred_bytes = 0;
     unsigned port = 1080;
 
     // PARSE ARGS

@@ -22,6 +22,10 @@
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 
+extern int total_connections;
+extern int active_connections;
+extern unsigned long transferred_bytes;
+
 /** maquina de estados general */
 enum socks_v5state {
     /**
@@ -277,6 +281,8 @@ void socksv5_passive_accept(struct selector_key *key) {
     socklen_t client_addr_len = sizeof(client_addr);
     struct socks5* state = NULL;
     const int client = accept(key->fd, (struct sockaddr*) &client_addr, &client_addr_len);
+    active_connections++;
+    total_connections++;
     if(client == -1) {
         goto fail;
     }
@@ -777,9 +783,9 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     abort();
   }
   if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
-    fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port, sock->username, time_stamp());
+    fprintf(stdout, "New connection, %d-%d (Resolved IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr), sock->origin_port, sock->username, time_stamp());
   else
-    fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port, time_stamp());
+    fprintf(stdout, "New connection, %d-%d (Resolved IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr), sock->origin_port, time_stamp());
   return REQUEST_WRITE;
 
   finally:
@@ -924,6 +930,7 @@ static unsigned copy_write(struct selector_key *key) {
           {
             buffer_read_adv(d_orig->wb, count);
             fprintf(stdout, "Sent %d -> %d\n", sock->client_fd, sock->origin_fd);
+            transferred_bytes += count;
             buffer_compact(d_orig->wb);
           }
         }
@@ -941,6 +948,7 @@ static unsigned copy_write(struct selector_key *key) {
           {
             buffer_read_adv(d_cli->wb, count);
             fprintf(stdout, "Sent %d <- %d\n", sock->client_fd, sock->origin_fd);
+            transferred_bytes += count;
             buffer_compact(d_cli->wb);
           }
         }
@@ -1074,4 +1082,5 @@ static void socksv5_done(struct selector_key* key) {
         close(fds[i]);
       }
     }
+    active_connections--;
 }
