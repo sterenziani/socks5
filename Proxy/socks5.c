@@ -25,6 +25,7 @@
 extern int total_connections;
 extern int active_connections;
 extern unsigned long transferred_bytes;
+extern int max_clients;
 
 /** maquina de estados general */
 enum socks_v5state {
@@ -187,6 +188,11 @@ static const struct state_definition* socks5_describe_states(void);
 
 static struct socks5* socks5_new(int fd)
 {
+  if(active_connections >= max_clients)
+  {
+    fprintf(stdout, "Connection rejected. Maximum client capacity surpassed.\n");
+    return NULL;
+  }
   struct socks5* ret;
   if(pool == NULL) {
       ret = malloc(sizeof(*ret));
@@ -281,8 +287,6 @@ void socksv5_passive_accept(struct selector_key *key) {
     socklen_t client_addr_len = sizeof(client_addr);
     struct socks5* state = NULL;
     const int client = accept(key->fd, (struct sockaddr*) &client_addr, &client_addr_len);
-    active_connections++;
-    total_connections++;
     if(client == -1) {
         goto fail;
     }
@@ -296,6 +300,8 @@ void socksv5_passive_accept(struct selector_key *key) {
         // que se liberó alguna conexión.
         goto fail;
     }
+    active_connections++;
+    total_connections++;
     memcpy(&state->client_addr, &client_addr, client_addr_len);
     state->client_addr_len = client_addr_len;
     if(SELECTOR_SUCCESS != selector_register(key->s, client, &socks5_handler, OP_READ, state)) {

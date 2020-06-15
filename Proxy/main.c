@@ -17,18 +17,20 @@
 #include <errno.h>
 #include <signal.h>
 #include <unistd.h>
-#include <sys/types.h>   // socket
-#include <sys/socket.h>  // socket
+#include <sys/types.h>
+#include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
 #include "socks5.h"
 #include "selector.h"
 
-#define MAX_CLIENTS 1024
+#define MAX_CONNECTIONS 1024  // should be larger than max_clients*2
+#define MAX_CLIENTS 500
 
 int total_connections;
 int active_connections;
 unsigned long transferred_bytes;
+int max_clients;
 
 static bool done = false;
 
@@ -41,6 +43,7 @@ int main(const int argc, const char **argv) {
     total_connections = 0;
     active_connections = 0;
     transferred_bytes = 0;
+    max_clients = MAX_CLIENTS;
     unsigned port = 1080;
 
     // PARSE ARGS
@@ -115,7 +118,7 @@ int main(const int argc, const char **argv) {
         goto finally;
     }
 
-    selector = selector_new(MAX_CLIENTS);
+    selector = selector_new(MAX_CONNECTIONS);
     if(selector == NULL) {
         err_msg = "unable to create selector";
         goto finally;
