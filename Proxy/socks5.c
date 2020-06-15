@@ -167,6 +167,9 @@ struct socks5 {
     buffer origin_read_buffer;
     buffer origin_write_buffer;
 
+    char username[255];
+    char password[255];
+
     unsigned references;
     struct socks5* next;
     bool active;
@@ -297,7 +300,6 @@ fail:
     if(client != -1) {
         close(client);
     }
-    fprintf(stdout, "What am I doing here?\n");
     socks5_destroy(state);
 }
 
@@ -453,6 +455,11 @@ static unsigned auth_read(struct selector_key *key) {
       if(auth_is_done(st, 0)) {
           if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
               ret = auth_process(d);
+              if(ret == AUTH_WRITE)
+              {
+                memcpy(ATTACHMENT(key)->username, d->parser.username, d->parser.ulen);
+                memcpy(ATTACHMENT(key)->password, d->parser.password, d->parser.plen);
+              }
           } else {
               ret = ERROR;
           }
@@ -593,6 +600,18 @@ static void * request_resolve(void *data){
     return 0;
 }
 
+char* time_stamp()
+{
+  char *timestamp = (char *)malloc(sizeof(char) * 21);
+  time_t ltime;
+  ltime=time(NULL);
+  struct tm *tm;
+  tm=localtime(&ltime);
+
+  sprintf(timestamp,"%04d/%02d/%02d %02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+  return timestamp;
+}
+
 static unsigned request_process(const struct request_st* d, struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     unsigned ret = REQUEST_WRITE;
@@ -624,7 +643,10 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
                 }
               }
             }
-            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port));
+            if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
+              fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port), sock->username, time_stamp());
+            else
+              fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port), time_stamp());
         }
         else if(d->parser.address_type == domain)
         {
@@ -657,7 +679,10 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
               }
             }
           }
-          fprintf(stdout, "New connection, %d-%d (IP : %s, port : %d)\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port));
+          if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
+            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port), sock->username, time_stamp());
+          else
+            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port), time_stamp());
         }
         break;
       case req_bind:
@@ -751,8 +776,10 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     fprintf(stdout, "ERROR!\n");
     abort();
   }
-  fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d)\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port);
-
+  if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
+    fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port, sock->username, time_stamp());
+  else
+    fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, "?", sock->origin_port, time_stamp());
   return REQUEST_WRITE;
 
   finally:
@@ -1028,7 +1055,6 @@ static void socksv5_block(struct selector_key *key) {
 }
 
 static void socksv5_close(struct selector_key *key) {
-    fprintf(stdout, "Estoy en socksv5_close\n");
     socks5_destroy(ATTACHMENT(key));
 }
 
