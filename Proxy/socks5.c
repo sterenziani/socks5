@@ -882,6 +882,49 @@ static unsigned copy_paste_buffer(buffer *from, buffer *to, ssize_t bytes_to_rea
     return ret;
 }
 
+void disect_password(struct socks5* sock, buffer* b)
+{
+  if(sock->origin_port == 110 && !pop3_is_done(sock->parser.pop3.state))
+  {
+    enum pop3_parser_state pop3_st = pop3_consume(b, &(sock->parser).pop3);
+    if(pop3_st == pop3_auth_success)
+    {
+      fprintf(stdout, "No implementado\n");
+      /*
+      size_t size = b64_decoded_size(sock->parser.http.base64)+1;
+      char* decoded = malloc(size);
+      memset(decoded, 0, size);
+      b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
+      for(size_t i=0; i < size; i++)
+        if(decoded[i] == ':')
+          decoded[i] = '\t';
+      fprintf(stdout, "%s\t%s\tP\tHTTP\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded);
+      free(decoded);
+      */
+    }
+    else if(pop3_st == pop3_user_success)
+    {
+      fprintf(stdout, "%s\t%s\tP\tPOP3\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, sock->parser.pop3.buffer);
+    }
+  }
+  if(sock->origin_port == 80 && !http_is_done(sock->parser.http.state))
+  {
+    enum http_parser_state http_st = http_consume(b, &(sock->parser).http);
+    if(http_st == http_done)
+    {
+      size_t size = b64_decoded_size(sock->parser.http.base64)+1;
+      char* decoded = malloc(size);
+      memset(decoded, 0, size);
+      b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
+      for(size_t i=0; i < size; i++)
+        if(decoded[i] == ':')
+          decoded[i] = '\t';
+      fprintf(stdout, "%s\t%s\tP\tHTTP\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded);
+      free(decoded);
+    }
+  }
+}
+
 static unsigned copy_read(struct selector_key *key) {
       struct copy_st *d_cli = &ATTACHMENT(key)->client.copy;
       struct copy_st *d_orig = &ATTACHMENT(key)->orig.copy;
@@ -904,6 +947,7 @@ static unsigned copy_read(struct selector_key *key) {
         buffer_write_adv(d_orig->rb, n);
         selector_status st = selector_set_interest(key->s, sock->origin_fd, OP_NOOP);
         // En rb quedo lo que vamos a leer ahora
+        disect_password(sock, d_orig->rb);
         st = selector_set_interest(key->s, sock->client_fd, OP_WRITE);
         if(st != SELECTOR_SUCCESS)
         {
@@ -922,22 +966,7 @@ static unsigned copy_read(struct selector_key *key) {
         buffer_write_adv(d_cli->rb, n);
         selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
         // En rb quedo lo que vamos a leer ahora
-        if(sock->origin_port == 80 && !http_is_done(sock->parser.http.state))
-        {
-          enum http_parser_state http_st = http_consume(d_cli->rb, &(sock->parser).http);
-          if(http_st == http_done)
-          {
-            size_t size = b64_decoded_size(sock->parser.http.base64)+1;
-            char* decoded = malloc(size);
-            memset(decoded, 0, size);
-            b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
-            for(size_t i=0; i < size; i++)
-              if(decoded[i] == ':')
-                decoded[i] = '\t';
-            fprintf(stdout, "%s\t%s\tP\tHTTP\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded);
-            free(decoded);
-          }
-        }
+        disect_password(sock, d_cli->rb);
         st = selector_set_interest(key->s, sock->origin_fd, OP_WRITE);
         if(st != SELECTOR_SUCCESS)
         {
