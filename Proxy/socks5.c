@@ -19,6 +19,8 @@
 #include "stm.h"
 #include "socks5.h"
 #include "netutils.h"
+#include "passwords.h"
+#include "base64.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 
@@ -161,6 +163,11 @@ struct socks5 {
     int origin_domain;
     socklen_t origin_addr_length;
     struct sockaddr_storage origin_addr_storage;
+
+    union{
+      struct http_parser http;
+      struct pop3_parser pop3;
+    } parser;
 
     uint8_t raw_buff_a[2048];
     uint8_t raw_buff_b[2048];
@@ -614,14 +621,26 @@ static void * request_resolve(void *data){
 
 char* time_stamp()
 {
-  char *timestamp = (char *)malloc(sizeof(char) * 21);
+  char *timestamp = (char *)malloc(sizeof(char) * 22);
   time_t ltime;
   ltime=time(NULL);
   struct tm *tm;
   tm=localtime(&ltime);
 
-  sprintf(timestamp,"%04d/%02d/%02d %02d:%02d:%02d", tm->tm_year+1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
+  sprintf(timestamp,"%04d-%02d-%02dT%02d:%02d:%02dZ", tm->tm_year+1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
   return timestamp;
+}
+
+void initialize_communication_parser(struct socks5* sock)
+{
+  if(sock->origin_fd == 80)
+  {
+    http_parser_init(&(sock->parser).http);
+  }
+  else if(sock->origin_fd == 110)
+  {
+    // Inicializar parser POP3
+  }
 }
 
 static unsigned request_process(const struct request_st* d, struct selector_key *key) {
@@ -655,8 +674,10 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
                 }
               }
             }
+            sock->origin_port = ntohs(address.sin_port);
+            initialize_communication_parser(sock);
             if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
-              fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port), sock->username, time_stamp());
+              fprintf(stdout, "%s\t%s\tA\t{IP usuario}\t{puerto usuario}\t{destino}\t%d\t0\n" ,time_stamp(), sock->username, ntohs(address.sin_port));
             else
               fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(address.sin_addr), ntohs(address.sin_port), time_stamp());
         }
@@ -691,6 +712,8 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
               }
             }
           }
+          sock->origin_port = ntohs(address.sin6_port);
+          initialize_communication_parser(sock);
           if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
             fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port), sock->username, time_stamp());
           else
@@ -788,6 +811,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     fprintf(stdout, "ERROR!\n");
     abort();
   }
+  initialize_communication_parser(sock);
   if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
     fprintf(stdout, "New connection, %d-%d (Resolved IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, inet_ntoa(((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr), sock->origin_port, sock->username, time_stamp());
   else
@@ -898,6 +922,22 @@ static unsigned copy_read(struct selector_key *key) {
         buffer_write_adv(d_cli->rb, n);
         selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
         // En rb quedo lo que vamos a leer ahora
+        if(sock->origin_port == 80 && !http_is_done(sock->parser.http.state))
+        {
+          enum http_parser_state http_st = http_consume(d_cli->rb, &(sock->parser).http);
+          if(http_st == http_done)
+          {
+            size_t size = b64_decoded_size(sock->parser.http.base64)+1;
+            char* decoded = malloc(size);
+            memset(decoded, 0, size);
+            b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
+            for(size_t i=0; i < size; i++)
+              if(decoded[i] == ':')
+                decoded[i] = '\t';
+            fprintf(stdout, "%s\t%s\tP\tHTTP\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded);
+            free(decoded);
+          }
+        }
         st = selector_set_interest(key->s, sock->origin_fd, OP_WRITE);
         if(st != SELECTOR_SUCCESS)
         {
