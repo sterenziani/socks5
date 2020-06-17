@@ -143,9 +143,10 @@ void pop3_parser_init (struct pop3_parser *p){
 }
 
 static char okay[] = "+OK";
-static char auth[] = "AUTH ";
+static char auth[] = "AUTH PLAIN";
 static char user[] = "USER ";
 static char pass[] = "PASS ";
+static char auth_go[] = "+ ";
 
 void pop3_clean_buffer(struct pop3_parser *p){
   memset(p->buffer, 0, p->buff_length);
@@ -203,7 +204,124 @@ enum pop3_parser_state pop3_parser_feed (struct pop3_parser *p, uint8_t b){
                                   p->state = pop3_read;
                                 break;
 
-    case pop3_read_auth:        break;
+    case pop3_read_auth:        if(p->read == strlen(auth))
+                                {
+                                  p->read = 0;
+                                  if(b == 0x0d)
+                                  {
+                                    p->state = pop3_await_newline1;
+                                    break;
+                                  }
+                                  else if(b == 0x0a)
+                                  {
+                                    p->state = pop3_await_auth_go;
+                                    break;
+                                  }
+                                  else if(b == ' ')
+                                  {
+                                    p->state = pop3_read_base64;
+                                    break;
+                                  }
+                                }
+                                if(toupper(b) == auth[p->read])
+                                {
+                                  p->read++;
+                                }
+                                else{
+                                  p->read = 0;
+                                  p->state = pop3_read;
+                                }
+                                break;
+
+    case pop3_await_newline1:   if(b == 0x0a)
+                                {
+                                  p->state = pop3_await_auth_go;
+                                  p->read = 0;
+                                }
+                                else
+                                {
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
+                                break;
+
+    case pop3_await_auth_go:    if(p->read == strlen(auth_go))
+                                {
+                                  if(b == 0x0d)
+                                  {
+                                    p->state = pop3_await_newline2;
+                                    break;
+                                  }
+                                  else if(b == 0x0a)
+                                  {
+                                    p->state = pop3_read_base64;
+                                    break;
+                                  }
+                                }
+                                else if(b == auth_go[p->read])
+                                {
+                                  p->read++;
+                                }
+                                else{
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
+                                break;
+
+    case pop3_await_newline2:   if(b == 0x0a)
+                                {
+                                  p->state = pop3_read_base64;
+                                }
+                                else{
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
+                                break;
+
+    case pop3_read_base64:      if(b == 0x0a)
+                                {
+                                  p->state = pop3_await_auth_ok;
+                                  p->read = 0;
+                                  break;
+                                }
+                                if(b == 0x0d)
+                                {
+                                  p->state = pop3_await_newline3;
+                                  p->read = 0;
+                                  break;
+                                }
+                                p->buffer[p->buff_length] = b;
+                                p->buff_length++;
+                                break;
+
+    case pop3_await_newline3:   if(b == 0x0a)
+                                {
+                                  p->state = pop3_await_auth_ok;
+                                  p->read = 0;
+                                  break;
+                                }
+                                else{
+                                  pop3_clean_buffer(p);
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
+                                break;
+
+    case pop3_await_auth_ok:    if(p->read == strlen(okay))
+                                {
+                                  p->state = pop3_auth_success;
+                                  break;
+                                }
+                                if(toupper(b) == okay[p->read])
+                                {
+                                  p->read++;
+                                }
+                                else{
+                                  pop3_clean_buffer(p);
+                                  p->state = pop3_read;
+                                  break;
+                                }
+                                break;
 
     case pop3_read_user_com:    if(toupper(b) == user[p->read])
                                 {
@@ -227,31 +345,73 @@ enum pop3_parser_state pop3_parser_feed (struct pop3_parser *p, uint8_t b){
                                   p->read = 0;
                                   break;
                                 }
+                                if(b == 0x0d)
+                                {
+                                  p->state = pop3_await_newline4;
+                                  break;
+                                }
                                 p->buffer[p->buff_length] = b;
                                 p->buff_length++;
                                 break;
 
-    case pop3_await_user_ok:    if(toupper(b) == okay[p->read])
+    case pop3_await_newline4:   if(b == 0x0a)
+                                {
+                                  p->state = pop3_await_user_ok;
+                                  p->read = 0;
+                                  break;
+                                }
+                                else{
+                                  pop3_clean_buffer(p);
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
+                                break;
+
+    case pop3_await_user_ok:    if(p->read == strlen(okay))
+                                {
+                                  if(b == 0x0a)
+                                  {
+                                    p->state = pop3_read_pass_com;
+                                    p->read = 0;
+                                    p->buffer[p->buff_length] = '\t';
+                                    p->buff_length++;
+                                    break;
+                                  }
+                                  else if(b == 0x0d)
+                                  {
+                                    p->state = pop3_user_ok_done;
+                                    break;
+                                  }
+                                  else{
+                                    p->read = 0;
+                                    p->state = pop3_read;
+                                  }
+                                  break;
+                                }
+                                if(toupper(b) == okay[p->read])
                                 {
                                   p->read++;
                                 }
                                 else{
                                   pop3_clean_buffer(p);
                                   p->state = pop3_read;
+                                  p->read = 0;
                                   break;
                                 }
-                                if(p->read == strlen(okay))
-                                {
-                                  p->state = pop3_user_ok_read;
-                                }
+
                                 break;
 
-    case pop3_user_ok_read:     if(b == 0x0a)
+    case pop3_user_ok_done:     if(b == 0x0a)
                                 {
                                   p->state = pop3_read_pass_com;
                                   p->read = 0;
                                   p->buffer[p->buff_length] = '\t';
                                   p->buff_length++;
+                                }
+                                else{
+                                  pop3_clean_buffer(p);
+                                  p->state = pop3_read;
+                                  p->read = 0;
                                 }
                                 break;
 
@@ -261,6 +421,7 @@ enum pop3_parser_state pop3_parser_feed (struct pop3_parser *p, uint8_t b){
                                 }
                                 else if(toupper(b) == user[0])
                                 {
+                                  pop3_clean_buffer(p);
                                   p->read = 1;
                                   p->state = pop3_read_user_com;
                                 }
@@ -283,8 +444,26 @@ enum pop3_parser_state pop3_parser_feed (struct pop3_parser *p, uint8_t b){
                                   p->read = 0;
                                   break;
                                 }
+                                if(b == 0x0d)
+                                {
+                                  p->state = pop3_await_newline5;
+                                  break;
+                                }
                                 p->buffer[p->buff_length] = b;
                                 p->buff_length++;
+                                break;
+
+    case pop3_await_newline5:   if(b == 0x0a)
+                                {
+                                  p->state = pop3_await_user_ok;
+                                  p->read = 0;
+                                  break;
+                                }
+                                else{
+                                  pop3_clean_buffer(p);
+                                  p->state = pop3_read;
+                                  p->read = 0;
+                                }
                                 break;
 
     case pop3_await_pass_ok:    if(toupper(b) == okay[p->read])

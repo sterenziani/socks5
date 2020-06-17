@@ -470,7 +470,7 @@ static unsigned auth_read(struct selector_key *key) {
   n = recv(key->fd, ptr, count, 0);
   if(n > 0) {
       buffer_write_adv(d->rb, n);
-      const enum request_state st = auth_consume(d->rb, &d->parser, &error);
+      const enum auth_state st = auth_consume(d->rb, &d->parser, &error);
       if(auth_is_done(st, 0)) {
           if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
               ret = auth_process(d);
@@ -715,7 +715,7 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
           sock->origin_port = ntohs(address.sin6_port);
           initialize_communication_parser(sock);
           if(strlen(sock->username) > 0 || strlen(sock->password) > 0)
-            fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by %s on %s\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port), sock->username, time_stamp());
+            fprintf(stdout, "%s\t%s\tA\t{IP usuario}\t{puerto usuario}\t{destino}\t%d\t0\n" ,time_stamp(), sock->username, ntohs(address.sin6_port));
           else
             fprintf(stdout, "New connection, %d-%d (IP : %s , port : %d) by anonymous user on %s\n" , sock->client_fd, sock->origin_fd, ip, ntohs(address.sin6_port), time_stamp());
         }
@@ -889,18 +889,19 @@ void disect_password(struct socks5* sock, buffer* b)
     enum pop3_parser_state pop3_st = pop3_consume(b, &(sock->parser).pop3);
     if(pop3_st == pop3_auth_success)
     {
-      fprintf(stdout, "No implementado\n");
-      /*
-      size_t size = b64_decoded_size(sock->parser.http.base64)+1;
+      size_t size = b64_decoded_size(sock->parser.pop3.buffer)+1;
       char* decoded = malloc(size);
       memset(decoded, 0, size);
-      b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
-      for(size_t i=0; i < size; i++)
-        if(decoded[i] == ':')
+      fprintf(stdout, "%s\n", sock->parser.pop3.buffer);
+      b64_decode(sock->parser.pop3.buffer, (uint8_t*) decoded, size);
+      for(size_t i=1; i < size; i++)
+        if(decoded[i] < 32)
+        {
           decoded[i] = '\t';
-      fprintf(stdout, "%s\t%s\tP\tHTTP\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded);
+          break;
+        }
+      fprintf(stdout, "%s\t%s\tP\tPOP3\t{destino}\t%d\t%s\n", time_stamp(), sock->username, sock->origin_port, decoded+1);
       free(decoded);
-      */
     }
     else if(pop3_st == pop3_user_success)
     {

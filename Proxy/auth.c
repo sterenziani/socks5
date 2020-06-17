@@ -8,8 +8,6 @@ extern void auth_parser_init (struct auth_parser *p){
   p->remaining = 0;
   p->ulen = 0;
   p->plen = 0;
-  //memset(p->username, 0x00, 256);
-  //memset(p->password, 0x00, 256);
 }
 
 enum auth_state auth_parser_feed (struct auth_parser *p, uint8_t b){
