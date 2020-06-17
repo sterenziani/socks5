@@ -445,7 +445,7 @@ parser_doh_getAddrInfo(struct parser_doh *p, int *err){
   if(p->stage == STAGE_END){
     *err = 0;
   }else{
-    *err = 0;
+    *err = -1;
   }
   return p->addrInfo_root;
 }

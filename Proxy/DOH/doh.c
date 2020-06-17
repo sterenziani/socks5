@@ -13,6 +13,11 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   struct sockaddr_in server;
   getDohServer(&server);
 
+  // timeout time
+  struct timespec timeout;
+  timeout.tv_sec = TIMEOUT_SEC;
+  timeout.tv_nsec = 0;
+
   // create a socket
   sockfd = socket(ADDRESS_TYPE, SOCK_STREAM, 0);
   if(sockfd<0){
@@ -34,7 +39,7 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
     shutdown(sockfd, SHUT_RDWR);
 		return -1;
 	} else if(errno == EINPROGRESS) {
-    if(pselect(sockfd+1,NULL,&socketSet,NULL,NULL,NULL)==-1){
+    if(pselect(sockfd+1,NULL,&socketSet,NULL,&timeout,NULL)==-1){
       perror("Select error");
       shutdown(sockfd, SHUT_RDWR);
       return -1;
@@ -82,10 +87,6 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   buffer_init(&response, N(direct_buff_res), direct_buff_res);
 
   // read response
-
-  struct timespec timeout;
-  timeout.tv_sec = TIMEOUT_SEC;
-  timeout.tv_nsec = 0;
 
   sigset_t blockset;
 
@@ -193,11 +194,6 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
     return -1;
   }
 
-  // verificacion si el dnsType es AF_INET o AF_INET6
-  if(dnsType!= AF_INET && dnsType!=AF_INET6 ){
-    return -1;
-  }
-
   //preparing the buffer
   buffer_reset(b);
 
@@ -277,10 +273,11 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
 
   // QTYPE
   buffer_write(b,(uint8_t)0x00);
-  if(dnsType==AF_INET){
-    buffer_write(b,(uint8_t)0x01);
-  }else{
+  if(dnsType==AF_INET6){
     buffer_write(b,(uint8_t)0x1c);
+  }else{
+    // si me llega AF_UNSPEC, lo mando a ipv4
+    buffer_write(b,(uint8_t)0x01);
   }
 
   // QCLASS - Internet es 1
