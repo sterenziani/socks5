@@ -118,6 +118,84 @@ void auth_parser_close(struct auth_parser *p){
     /* no hay nada que liberar */
 }
 
+// Retorna 0 si el usuario y contraseña son validos. 1 si no lo son.
+int user_pass_valid(const char* u, int ulen, const char* p, int plen)
+{
+  FILE* f = fopen("users.txt", "r");
+  if(f == NULL)
+    return 1;
+  bool searching = true;
+  bool possible = true;
+  int c;
+  int u_counter = 0;
+  int p_counter = 0;
+  while(searching)
+  {
+    u_counter = 0;
+    p_counter = 0;
+    possible = true;
+    // Empezamos una nueva linea
+    while(possible && u_counter < ulen)
+    {
+      c = fgetc(f);
+      if(c == EOF){
+        fclose(f);
+        return 1;
+      }
+      else if(c == u[u_counter]){
+        u_counter++;
+      }
+      else{
+        possible = false;
+      }
+    }
+    // Ya lei al usuario. Si matchea, debería seguir un :
+    if(possible)
+    {
+      if((c = fgetc(f)) != ':')
+        possible = false;
+      if(c == EOF){
+        fclose(f);
+        return 1;
+      }
+    }
+    //El usuario estaba bien y tenia la longitud correcta. Miro la contraseña
+    while(possible && p_counter < plen)
+    {
+      c = fgetc(f);
+      if(c == EOF){
+        fclose(f);
+        return 1;
+      }
+      else if(c == p[p_counter])
+        p_counter++;
+      else
+        possible = false;
+    }
+    // Else, ya lei la contraseña. Si estaba bien, veo que termine ahí.
+    if(possible)
+    {
+      if((c = fgetc(f)) != '\n' && c != EOF)
+        possible = false;
+      else
+        searching = false;
+    }
+    // Si no era posible, me muevo hasta el final de linea
+    else
+    {
+      while(c != '\n' && c != EOF)
+        c = fgetc(f);
+    }
+  }
+  // Si llegó hasta acá y es possible, es que matcheó.
+  if(possible)
+  {
+    fclose(f);
+    return 0;
+  }
+  fclose(f);
+  return 1;
+}
 
 int auth_marshall(buffer *b, const uint8_t status){
   size_t n;
