@@ -789,7 +789,7 @@ static void request_resolve_init(const unsigned state, struct selector_key *key)
     free(dns_key);
     abort();
   }
-  sleep(1);
+  selector_set_interest(key->s, sock->client_fd, OP_NOOP);
 }
 
 static unsigned request_connect(struct selector_key *key, struct socks5* sock)
