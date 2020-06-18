@@ -540,6 +540,15 @@ static unsigned request_write(struct selector_key *key) {
     unsigned ret = COPY;
     size_t  count;
     uint8_t len, fam;
+    if(d->parser.error != request_success) {
+      uint8_t ip[16] = {0};
+      uint8_t port[2] = {0};
+      if(request_marshall(d->wb, ipv4, d->parser.error, ip, port, 16)<0){
+        abort();
+      }
+    return ERROR;
+    }
+
     if(sock->origin_addr_storage.ss_family == AF_INET6)
     {
       len = 16;
@@ -550,7 +559,7 @@ static unsigned request_write(struct selector_key *key) {
       fam = ipv4;
       len = 4;
     }
-    if(request_marshall(d->wb, fam, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data+2, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data, len) < 10)
+    if(request_marshall(d->wb, fam, request_success, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data+2, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data, len) < 10)
     {
       abort();
     }
