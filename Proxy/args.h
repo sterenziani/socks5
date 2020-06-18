@@ -34,11 +34,7 @@ struct socks5args {
 /**
  * Interpreta la linea de comandos (argc, argv) llenando
  * args con defaults o la seleccion humana. Puede cortar
-<<<<<<< HEAD
- * la ejecuciÃ³n.
-=======
  * la ejecución.
->>>>>>> 76e30b519fdcfbb83f01fc3d1c9adf96d46e731a
  */
 void 
 parse_args(const int argc, char **argv, struct socks5args *args);
