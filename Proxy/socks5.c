@@ -252,6 +252,7 @@ static void socks5_destroy(struct socks5* s) {
                 s->next = pool;
                 pool = s;
                 pool_size++;
+                freeaddrinfo(s->origin_resolution);
               }
             } else {
                 socks5_destroy_(s);
@@ -679,12 +680,14 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
             }
             sock->origin_port = ntohs(address.sin_port);
             initialize_communication_parser(sock);
+            char* timestamp = time_stamp();
             if(strlen(sock->username) > 0)
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", time_stamp(), sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
             else
             {
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", time_stamp(), "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
             }
+            free(timestamp);
         }
         else if(d->parser.address_type == domain)
         {
@@ -721,10 +724,12 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
           }
           sock->origin_port = ntohs(address.sin6_port);
           initialize_communication_parser(sock);
+          char* timestamp = time_stamp();
           if(strlen(sock->username) > 0)
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n" ,time_stamp(), sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
           else
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n" ,time_stamp(), "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
+          free(timestamp);
         }
         break;
       case req_bind:
@@ -783,13 +788,12 @@ static void request_resolve_init(const unsigned state, struct selector_key *key)
   // En otro thread, resolvé el nombre
   if (-1 == pthread_create(&tid, 0, request_resolve, dns_key))
   {
-    // no se logro crear el nuevo hilo
     fprintf(stdout, "Error when creating new thread!\n");
     selector_unregister_fd(key->s, sock->client_fd);
     free(dns_key);
     abort();
   }
-  sleep(1);
+  selector_set_interest(key->s, sock->client_fd, OP_NOOP);
 }
 
 static unsigned request_connect(struct selector_key *key, struct socks5* sock)
@@ -820,35 +824,29 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
   }
   initialize_communication_parser(sock);
   char* s = NULL;
+  char* user = NULL;
   if(strlen(sock->username) > 0)
-  {
-    if(sock->origin_resolution->ai_family == AF_INET)
-    {
-      s = malloc(INET_ADDRSTRLEN);
-      inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
-      fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", time_stamp(), sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
-    }
-    else if(sock->origin_resolution->ai_family == AF_INET6)
-    {
-      s = malloc(INET6_ADDRSTRLEN);
-      inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->origin_addr_storage))->sin6_addr, s, INET6_ADDRSTRLEN);
-      fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", time_stamp(), sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
-    };
-  }
+    user = sock->username;
   else
+    user = "ANON";
+
+  if(sock->origin_resolution->ai_family == AF_INET)
   {
-    if(sock->origin_resolution->ai_family == AF_INET)
-    {
-      s = malloc(INET_ADDRSTRLEN);
-      inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
-      fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", time_stamp(), "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
-    }
-      else if(sock->origin_resolution->ai_family == AF_INET6)
-    {
-      s = malloc(INET6_ADDRSTRLEN);
-      inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->origin_addr_storage))->sin6_addr, s, INET6_ADDRSTRLEN);
-      fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", time_stamp(), "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
-    }
+    s = malloc(INET_ADDRSTRLEN);
+    inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
+    char* timestamp = time_stamp();
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
+    free(s);
+    free(timestamp);
+  }
+  else if(sock->origin_resolution->ai_family == AF_INET6)
+  {
+    s = malloc(INET6_ADDRSTRLEN);
+    inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->origin_addr_storage))->sin6_addr, s, INET6_ADDRSTRLEN);
+    char* timestamp = time_stamp();
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
+    free(s);
+    free(timestamp);
   }
   return REQUEST_WRITE;
 
@@ -863,7 +861,7 @@ static unsigned request_resolve_done(struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     if(sock->origin_resolution == NULL)
     {
-      fprintf(stdout, "Unable to connect client %d to requested origin server", sock->client_fd);
+      fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
       freeaddrinfo(sock->origin_resolution);
       sock->origin_resolution = 0;
       return ERROR;
@@ -916,7 +914,6 @@ static unsigned copy_paste_buffer(buffer *from, buffer *to, ssize_t bytes_to_rea
 
 void disect_password(struct socks5* sock, buffer* b)
 {
-  ////////////
   char* s;
   if(sock->needed_resolve)
   {
@@ -930,11 +927,11 @@ void disect_password(struct socks5* sock, buffer* b)
     s = malloc(INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
   }
-  ////////////
 
   if(sock->origin_port == 110 && !pop3_is_done(sock->parser.pop3.state))
   {
     enum pop3_parser_state pop3_st = pop3_consume(b, &(sock->parser).pop3);
+    char* timestamp = time_stamp();
     if(pop3_st == pop3_auth_success)
     {
       size_t size = b64_decoded_size(sock->parser.pop3.buffer)+1;
@@ -942,24 +939,27 @@ void disect_password(struct socks5* sock, buffer* b)
       memset(decoded, 0, size);
       b64_decode(sock->parser.pop3.buffer, (uint8_t*) decoded, size);
       for(size_t i=1; i < size; i++)
+      {
         if(decoded[i] < 32)
         {
           decoded[i] = '\t';
           break;
         }
+      }
       if(strlen(sock->username) > 0)
-        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", time_stamp(), sock->username, s, sock->origin_port, decoded+1);
+        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", timestamp, sock->username, s, sock->origin_port, decoded+1);
       else
-        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", time_stamp(), "ANON", s, sock->origin_port, decoded+1);
+        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", timestamp, "ANON", s, sock->origin_port, decoded+1);
       free(decoded);
     }
     else if(pop3_st == pop3_user_success)
     {
       if(strlen(sock->username) > 0)
-        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", time_stamp(), sock->username, s, sock->origin_port, sock->parser.pop3.buffer);
+        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", timestamp, sock->username, s, sock->origin_port, sock->parser.pop3.buffer);
       else
-        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", time_stamp(), "ANON", s, sock->origin_port, sock->parser.pop3.buffer);
+        fprintf(stdout, "%s\t%s\tP\tPOP3\t%s\t%d\t%s\n", timestamp, "ANON", s, sock->origin_port, sock->parser.pop3.buffer);
     }
+    free(timestamp);
   }
   if(sock->origin_port == 80 && !http_is_done(sock->parser.http.state))
   {
@@ -971,15 +971,21 @@ void disect_password(struct socks5* sock, buffer* b)
       memset(decoded, 0, size);
       b64_decode(sock->parser.http.base64, (uint8_t*) decoded, size);
       for(size_t i=0; i < size; i++)
+      {
         if(decoded[i] == ':')
           decoded[i] = '\t';
+      }
+      char* timestamp = time_stamp();
       if(strlen(sock->username) > 0)
-        fprintf(stdout, "%s\t%s\tP\tHTTP\t%s\t%d\t%s\n", time_stamp(), sock->username, s, sock->origin_port, decoded);
+        fprintf(stdout, "%s\t%s\tP\tHTTP\t%s\t%d\t%s\n", timestamp, sock->username, s, sock->origin_port, decoded);
       else
-        fprintf(stdout, "%s\t%s\tP\tHTTP\t%s\t%d\t%s\n", time_stamp(), "ANON", s, sock->origin_port, decoded);
+        fprintf(stdout, "%s\t%s\tP\tHTTP\t%s\t%d\t%s\n", timestamp, "ANON", s, sock->origin_port, decoded);
       free(decoded);
+      free(timestamp);
     }
   }
+  if(! sock->needed_resolve)
+    free(s);
 }
 
 static unsigned copy_read(struct selector_key *key) {
@@ -996,7 +1002,7 @@ static unsigned copy_read(struct selector_key *key) {
         ptr = buffer_write_ptr(d_orig->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
-          fprintf(stdout, "Connection with origin server %d lost\n", key->fd);
+          //fprintf(stdout, "Connection with origin server %d lost\n", key->fd);
           shutdown(sock->origin_fd, SHUT_RD);
           shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
@@ -1015,7 +1021,7 @@ static unsigned copy_read(struct selector_key *key) {
         ptr = buffer_write_ptr(d_cli->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
-          fprintf(stdout, "Connection with client %d lost\n", key->fd);
+          //fprintf(stdout, "Connection with client %d lost\n", key->fd);
           shutdown(sock->origin_fd, SHUT_RD);
           shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
@@ -1035,6 +1041,7 @@ static unsigned copy_read(struct selector_key *key) {
         fprintf(stdout, "Unexpected fd: %d\n", key->fd);
         abort();
       }
+
   return ret;
 }
 
@@ -1061,7 +1068,7 @@ static unsigned copy_write(struct selector_key *key) {
           else
           {
             buffer_read_adv(d_orig->wb, count);
-            fprintf(stdout, "Sent %d -> %d\n", sock->client_fd, sock->origin_fd);
+            //fprintf(stdout, "Sent %d -> %d\n", sock->client_fd, sock->origin_fd);
             transferred_bytes += count;
             buffer_compact(d_orig->wb);
           }
@@ -1079,7 +1086,7 @@ static unsigned copy_write(struct selector_key *key) {
           else
           {
             buffer_read_adv(d_cli->wb, count);
-            fprintf(stdout, "Sent %d <- %d\n", sock->client_fd, sock->origin_fd);
+            //fprintf(stdout, "Sent %d <- %d\n", sock->client_fd, sock->origin_fd);
             transferred_bytes += count;
             buffer_compact(d_cli->wb);
           }
