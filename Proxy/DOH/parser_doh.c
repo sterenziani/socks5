@@ -283,9 +283,6 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
               p->addrInfo_root = malloc(sizeof(*(p->addrInfo_root)));
               memset(p->addrInfo_root,0,sizeof(*(p->addrInfo_root)));
               p->addrInfo_curr = p->addrInfo_root;
-
-              p->addrInfo_curr->ai_addr = malloc(sizeof(struct sockaddr_storage));
-              memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_storage));
             }
 
             if(p->prev_dnsIndex == p->dnsIndex){
@@ -322,18 +319,21 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
                   case 0x0001:  // ipv4
                     p->addrInfo_curr->ai_family = AF_INET;
                     p->addrInfo_curr->ai_addrlen = (size_t) sizeof(struct sockaddr_in);
+                    p->addrInfo_curr->ai_addr = malloc(sizeof(struct sockaddr_storage));
+                    memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_storage));
                     ((struct sockaddr_storage*)p->addrInfo_curr->ai_addr)->ss_family = AF_INET;
                     break;
                   case 0x001c:  // ipv6
                     p->addrInfo_curr->ai_family = AF_INET6;
                     p->addrInfo_curr->ai_addrlen = (size_t) sizeof(struct sockaddr_in6);
+                    p->addrInfo_curr->ai_addr = malloc(sizeof(struct sockaddr_storage));
+                    memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_storage));
                     ((struct sockaddr_storage*)p->addrInfo_curr->ai_addr)->ss_family = AF_INET6;
                     break;
                   case 0x0005:
                     p->addrInfo_curr->ai_flags = AI_CANONNAME;
                   default:
                     p->addrInfo_curr->ai_family = AF_UNSPEC;
-                    //free(p->addrInfo_curr->ai_addr);
                 }
                 break;
               case 2:
@@ -387,9 +387,6 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
                 p->addrInfo_curr->ai_next = malloc(sizeof(*(p->addrInfo_curr)));
                 p->addrInfo_curr = p->addrInfo_curr->ai_next;
                 memset(p->addrInfo_curr,0,sizeof(struct addrinfo));
-
-                p->addrInfo_curr->ai_addr = malloc(sizeof(struct sockaddr_storage));
-                memset(p->addrInfo_curr->ai_addr,0,sizeof(struct sockaddr_storage));
               }else{
                 p->status_dns = DNS_FINISHED;
                 p->status_http = DOH_FINISHED;
