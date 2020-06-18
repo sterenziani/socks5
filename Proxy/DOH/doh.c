@@ -13,6 +13,16 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   struct sockaddr_in server;
   getDohServer(&server);
 
+  //  to ignore sigpipe
+  signal(SIGPIPE, SIG_IGN);
+
+  //  block set
+  sigset_t blockset;
+  sigemptyset(&blockset);
+  sigaddset(&blockset, SIGINT);
+  sigaddset(&blockset, SIGPIPE);
+  sigprocmask(SIG_BLOCK, &blockset, NULL);
+
   // timeout time
   struct timespec timeout;
   timeout.tv_sec = TIMEOUT_SEC;
@@ -39,8 +49,28 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
     shutdown(sockfd, SHUT_RDWR);
 		return -1;
 	} else if(errno == EINPROGRESS) {
-    if(pselect(sockfd+1,NULL,&socketSet,NULL,&timeout,NULL)==-1){
+    if(pselect(sockfd+1,NULL,&socketSet,NULL,&timeout,&blockset)==-1){
       perror("Select error");
+      shutdown(sockfd, SHUT_RDWR);
+      return -1;
+    }
+
+    int option = 0;
+    socklen_t optionLen = sizeof(option);
+
+    if(getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &optionLen) == -1){
+  		perror("Couldn't get socket options");
+      shutdown(sockfd, SHUT_RDWR);
+  		return -1;
+    }else if(option != 0){
+      errno = option;
+  		perror("Connection failed");
+      shutdown(sockfd, SHUT_RDWR);
+  		return -1;
+    }
+
+    if(!FD_ISSET(sockfd, &socketSet)){
+      perror("Connect timed out");
       shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
@@ -88,12 +118,6 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
 
   // read response
 
-  sigset_t blockset;
-
-  sigemptyset(&blockset);
-  sigaddset(&blockset, SIGINT);
-  sigprocmask(SIG_BLOCK, &blockset, NULL);
-
   struct parser_doh *myDohParser = parser_doh_init();
 
   int n=0;
@@ -126,11 +150,13 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
       uint8_t *write_dir = buffer_write_ptr(res,&max_write);
 
       n = read(sockfd, write_dir, max_write);		//Reads the buffer
-      buffer_write_adv(res,n);
       if (n < 0){
         perror("Error on reading");
-        break;
+        parser_doh_destroy(myDohParser);
+        shutdown(sockfd, SHUT_RDWR);
+        return -1;
       }
+      buffer_write_adv(res,n);
 
     }else{
       // timed out
@@ -139,6 +165,9 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
       shutdown(sockfd, SHUT_RDWR);
       return -1;
     }
+
+    FD_ZERO(&socketSet);
+    FD_SET(sockfd,&socketSet);
   }while(n!=0);
 
   //hacer el parseo
@@ -183,7 +212,7 @@ getDohServer(struct sockaddr_in* server){
   server->sin_addr.s_addr = inet_addr(ADDRESS);  // host address
 }
 
-size_t
+ssize_t
 dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
 
   size_t hostlen = strlen(host);
@@ -284,10 +313,10 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
   buffer_write(b,(uint8_t)0x00);
   buffer_write(b,(uint8_t)0x01);
 
-  return buffer_readable(b);
+  return (ssize_t) buffer_readable(b);
 }
 
-size_t
+ssize_t
 httpEncode(char* doh, buffer *req, buffer *dnsMessage, char *contentLength){
 
   buffer_reset(req);
@@ -314,13 +343,13 @@ httpEncode(char* doh, buffer *req, buffer *dnsMessage, char *contentLength){
 
   buffer_write_string(req,"\r\n\r\n");
 
-  return buffer_readable(req);
+  return (ssize_t)buffer_readable(req);
 }
 
-size_t
+ssize_t
 sendHttpMessage(int fd, buffer *req){
 
-  size_t bytes_sent       = 0;
+  ssize_t bytes_sent       = 0;
   size_t total_bytes_sent = 0;
   size_t bytes_to_send    = 0;
   uint8_t *readPtr = buffer_read_ptr(req,&bytes_to_send);
@@ -335,7 +364,7 @@ sendHttpMessage(int fd, buffer *req){
     buffer_read_adv(req,bytes_sent);
   }
 
-  return total_bytes_sent;
+  return (ssize_t) total_bytes_sent;
 }
 
 int
