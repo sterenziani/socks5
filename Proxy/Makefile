@@ -2,7 +2,7 @@
 GCC=gcc
 GCCFLAGS= -pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 TARGET = main
-FILES = $(wildcard *.c) $(wildcard DOH/*.c)
+FILES = $(wildcard *.c)
   all: $(TARGET)
 
   $(TARGET): $(TARGET).c $(INCLUDES)

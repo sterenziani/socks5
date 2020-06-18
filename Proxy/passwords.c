@@ -15,6 +15,10 @@ enum http_parser_state http_parser_feed (struct http_parser *p, uint8_t b){
                                     {
                                       p->state = http_line_break;
                                     }
+                                    if(b == 0x0a)
+                                    {
+                                      p->state = http_line_start;
+                                    }
                                     break;
 
     case http_line_break:           if(b == 0x0a)
@@ -81,7 +85,7 @@ enum http_parser_state http_parser_feed (struct http_parser *p, uint8_t b){
                                     }
                                     break;
 
-    case http_read_base64:          if(b == 0x0d || isspace(b))
+    case http_read_base64:          if(b == 0x0d || b == 0x0a || isspace(b))
                                       p->state = http_done;
                                     else
                                     {
