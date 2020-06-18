@@ -103,7 +103,7 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   }
 
   // connect to HTTP
-  size_t bytes_sent = sendHttpMessage(sockfd,req);
+  ssize_t bytes_sent = sendHttpMessage(sockfd,req);
   if(bytes_sent<0){
     perror("send http message failed");
     shutdown(sockfd, SHUT_RDWR);

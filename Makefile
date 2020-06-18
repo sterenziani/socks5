@@ -4,7 +4,7 @@
 
 # Variables para compilador C
 CC=clang
-CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
+CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
