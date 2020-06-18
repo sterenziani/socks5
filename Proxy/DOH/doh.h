@@ -27,7 +27,7 @@
 //defines
 
 // defines relacionados con el doh server
-#define ADDRESS_PORT 8080
+#define ADDRESS_PORT 8053
 #define ADDRESS "127.0.0.1"
 #define ADDRESS_TYPE AF_INET
 
@@ -51,15 +51,15 @@ void
 getDohServer(struct sockaddr_in* server);
 
 // recibe un host y arma un dns message acorde en buffer
-size_t
+ssize_t
 dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize);
 
 // recibe la dirección de un doh server y un dns message y forma el request http
-size_t
+ssize_t
 httpEncode(char* doh, buffer *req, buffer *dnsMessage, char *contentLength);
 
 // recibe un fd y un http-request, manda dicho request por el file descriptor
-size_t
+ssize_t
 sendHttpMessage(int fd, buffer *request);
 
 // manda todo lo readable del buffer al parser doh

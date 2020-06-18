@@ -35,6 +35,7 @@ enum auth_state auth_consume(buffer *b, struct auth_parser *p, bool *errored);
 bool auth_is_done(const enum auth_state state, bool *errored);
 extern const char * auth_error(const struct auth_parser *p);
 void auth_parser_close(struct auth_parser *p);
+int user_pass_valid(const char* u, int ulen, const char* p, int plen);
 int auth_marshall(buffer *b, const uint8_t status);
 
 #endif
