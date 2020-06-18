@@ -17,7 +17,7 @@
 #define TIMEOUT_SEC 5
 
 //test variable
-#define HOST "itba.edu.ar"
+#define HOST "www.google.com."
 #define PORT "80"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -35,7 +35,7 @@ int main(int argc, char *argv[])
 
 void test_returns(void){
   struct addrinfo hints;
-  struct addrinfo *res_doh;
+  struct addrinfo *res_doh,*aux;
   int sockfd;
 
   memset(&hints, 0, sizeof hints);
@@ -61,22 +61,38 @@ void test_returns(void){
   //printf("%u\n",(unsigned) ((struct sockaddr_in*)res_doh->ai_next->ai_addr)->sin_addr.s_addr);
   //printf("%u\n",(unsigned) ((struct sockaddr_in*)res_dns->ai_next->ai_addr)->sin_addr.s_addr);
 
-  sockfd = socket(res_doh->ai_family,res_doh->ai_socktype,0);
+  aux = res_doh;
+  while(aux!=NULL && aux->ai_flags==AI_CANONNAME){
+    aux = aux->ai_next;
+  }
 
-  assert(connect(sockfd,res_doh->ai_addr,res_doh->ai_addrlen) == 0);
+  assert(aux!=NULL);
+
+  sockfd = socket(aux->ai_family,aux->ai_socktype,0);
+
+  assert(connect(sockfd,aux->ai_addr,aux->ai_addrlen) == 0);
   printf("doh_test/connect_ipv4:\tsuccess!\n");
 
   shutdown(sockfd, SHUT_RDWR);
   freeaddrinfo(res_doh);
+
+  // IPv6
 
   hints.ai_family = AF_INET6;
   result = solveDomain(HOST,PORT,&hints,&res_doh);
   assert(result==0);
   printf("doh_test/returns_ipv6:\tsuccess!\n");
 
-  sockfd = socket(res_doh->ai_family,res_doh->ai_socktype,0);
+  aux = res_doh;
+  while(aux!=NULL && aux->ai_flags==AI_CANONNAME){
+    aux = aux->ai_next;
+  }
 
-  assert(connect(sockfd,res_doh->ai_addr,res_doh->ai_addrlen) == 0);
+  assert(aux!=NULL);
+
+  sockfd = socket(aux->ai_family,aux->ai_socktype,0);
+
+  assert(connect(sockfd,aux->ai_addr,aux->ai_addrlen) == 0);
   printf("doh_test/connect_ipv6:\tsuccess!\n");
 
   shutdown(sockfd, SHUT_RDWR);

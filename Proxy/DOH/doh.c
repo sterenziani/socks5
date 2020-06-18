@@ -191,8 +191,14 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
 
     struct addrinfo *aux = *ret_addrInfo;
     while(aux!=NULL){
-      ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(port_number);
-      aux->ai_socktype = aux->ai_addr->sa_family;
+      if(aux->ai_family==AF_INET){
+        ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(port_number);
+      }else if(aux->ai_family==AF_INET6){
+        ((struct sockaddr_in6*)aux->ai_addr)->sin6_port = htons(port_number);
+      }
+
+      aux->ai_socktype = SOCK_STREAM;
+
       aux = aux->ai_next;
     }
   }
