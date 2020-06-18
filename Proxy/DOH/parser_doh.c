@@ -327,6 +327,8 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
                   p->addrInfo_curr->ai_addr->sa_family = AF_INET6;
                     p->addrInfo_curr->ai_family = AF_INET6;
                     break;
+                  case 0x0005:
+                    p->addrInfo_curr->ai_flags = AI_CANONNAME;
                   default:
                     p->addrInfo_curr->ai_family = AF_UNSPEC;
                 }

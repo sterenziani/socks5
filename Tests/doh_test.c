@@ -18,7 +18,6 @@
 
 //test variable
 #define HOST "itba.edu.ar"
-#define DNS_TYPE AF_INET
 #define PORT "80"
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
@@ -40,12 +39,12 @@ void test_returns(void){
   int sockfd;
 
   memset(&hints, 0, sizeof hints);
-	hints.ai_family = DNS_TYPE;
+	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
   size_t result = solveDomain(HOST,PORT,&hints,&res_doh);
   assert(result==0);
-  printf("doh_test/connect:\tsuccess!\n");
+  printf("doh_test/returns_ipv4:\tsuccess!\n");
 
   // dejando getaddrinfo para la forma tradicional
   /*
@@ -65,7 +64,20 @@ void test_returns(void){
   sockfd = socket(res_doh->ai_family,res_doh->ai_socktype,0);
 
   assert(connect(sockfd,res_doh->ai_addr,res_doh->ai_addrlen) == 0);
-  printf("doh_test/can_connect_to_returned_address:\tsuccess!\n");
+  printf("doh_test/connect_ipv4:\tsuccess!\n");
+
+  shutdown(sockfd, SHUT_RDWR);
+  freeaddrinfo(res_doh);
+
+  hints.ai_family = AF_INET6;
+  result = solveDomain(HOST,PORT,&hints,&res_doh);
+  assert(result==0);
+  printf("doh_test/returns_ipv6:\tsuccess!\n");
+
+  sockfd = socket(res_doh->ai_family,res_doh->ai_socktype,0);
+
+  assert(connect(sockfd,res_doh->ai_addr,res_doh->ai_addrlen) == 0);
+  printf("doh_test/connect_ipv6:\tsuccess!\n");
 
   shutdown(sockfd, SHUT_RDWR);
   freeaddrinfo(res_doh);
