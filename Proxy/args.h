@@ -40,4 +40,3 @@ void
 parse_args(const int argc, char **argv, struct socks5args *args);
 
 #endif
-

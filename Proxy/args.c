@@ -40,7 +40,7 @@ user(char *s, struct users *user) {
 static void
 version(void) {
     fprintf(stderr, "socks5v version 0.0\n"
-                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo X\n"
+                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
                     "AQUI VA LA LICENCIA\n");
 }
 
@@ -55,7 +55,7 @@ usage(const char *progname) {
         "   -p <SOCKS port>  Puerto entrante conexiones SOCKS.\n"
         "   -P <conf port>   Puerto entrante conexiones configuracion\n"
         "   -u <name>:<pass> Usuario y contraseña de usuario que puede usar el proxy. Hasta 10.\n"
-        "   -v               Imprime información sobre la versión versión y termina.\n"
+        "   -v               Imprime información sobre la versión y termina.\n"
         "\n"
         "   --doh-ip    <ip>    \n"
         "   --doh-port  <port>  XXX\n"
