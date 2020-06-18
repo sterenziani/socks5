@@ -21,6 +21,7 @@
 #include "netutils.h"
 #include "passwords.h"
 #include "base64.h"
+#include "DOH/doh.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 
@@ -600,6 +601,20 @@ static void * request_resolve(void *data){
     };
     char buff[7];
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
+    /*
+    solveDomain(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family == AF_UNSPEC)
+    {
+      fprintf(stdout, "Es unspec!\n");
+      sock->origin_resolution = sock->origin_resolution->ai_next;
+    }
+    if(sock->origin_resolution == NULL)
+    {
+      fprintf(stdout, "Es null\n");
+      return 0;
+    }
+    fprintf(stdout, "Sin Addr: %u\n", ((struct sockaddr_in*)(sock->origin_resolution->ai_addr))->sin_addr.s_addr);
+    */
     getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     selector_notify_block(key->s, key->fd);
     free(data);

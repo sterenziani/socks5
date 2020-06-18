@@ -192,14 +192,12 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
     struct addrinfo *aux = *ret_addrInfo;
     while(aux!=NULL){
       ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(port_number);
-      aux->ai_socktype = hints->ai_socktype;
+      aux->ai_socktype = aux->ai_addr->sa_family;
       aux = aux->ai_next;
     }
   }
-
   parser_doh_destroy(myDohParser);
   shutdown(sockfd, SHUT_RDWR);
-
 	return err;
 }
 

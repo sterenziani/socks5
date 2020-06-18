@@ -27,7 +27,7 @@
 //defines
 
 // defines relacionados con el doh server
-#define ADDRESS_PORT 8080
+#define ADDRESS_PORT 8053
 #define ADDRESS "127.0.0.1"
 #define ADDRESS_TYPE AF_INET
 

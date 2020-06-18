@@ -3,7 +3,7 @@
 ##
 
 # Variables para compilador C
-CC=gcc
+CC=clang
 CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
 DOH_DIR=$(DIR)/DOH
@@ -15,7 +15,7 @@ OBJ=$(DEPS:.h=.o)
 # Variables para doh Server
 ## Al modificar el puerto, recordar tambien modificar dicho valor en Proxy/doh.c
 DOCKER=sudo docker
-DOH_PORT=8080
+DOH_PORT=8053
 DOH_IMAGE=doh-nginx
 DOH_CONTAINER=doh-server
 
