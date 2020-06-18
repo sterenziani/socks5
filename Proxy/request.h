@@ -19,16 +19,24 @@ enum request_state {
     request_error_mem_alloc,
 };
 
+enum request_error_code {
+    request_success = 0x00,
+    request_socks_fail = 0x01,
+    request_connection_fail = 0x05,
+    request_unsupported_cmd = 0x07,
+    request_unsupported_atyp = 0x08,
+};
+
 enum request_command {
-	req_connect = 1,
-	req_bind = 2,
-	req_udp_associate = 3,
+	req_connect = 0x01,
+	req_bind = 0x02,
+	req_udp_associate = 0x03,
 };
 
 enum request_address_type {
-	ipv4 = 1,
-	domain = 3,
-	ipv6 = 4,
+	ipv4 = 0x01,
+	domain = 0x03,
+	ipv6 = 0x04,
 };
 
 struct request_parser {
@@ -37,6 +45,7 @@ struct request_parser {
     enum request_state state;
     enum request_command command;
     enum request_address_type address_type;
+    enum request_error_code error;
     uint8_t port[2];
     uint8_t address[255];
     uint8_t remaining;
@@ -88,5 +97,5 @@ void request_parser_close(struct request_parser *p);
  * espacio suficiente.
  */
 int
-request_marshall(buffer *b, const uint8_t atyp, 
+request_marshall(buffer *b, const uint8_t atyp, const uint8_t reply,
     const uint8_t address[], const uint8_t port[], const uint8_t len);

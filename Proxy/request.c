@@ -7,6 +7,7 @@ extern void request_parser_init(struct request_parser *p) {
     p->state     = request_version;
     p->remaining = 0;
     p->addr_ptr = 0;
+    p->error = request_success;
 }
 
 extern enum request_state
@@ -31,6 +32,7 @@ request_parser_feed(struct request_parser *p, const uint8_t b) {
                 p->command = req_udp_associate;
             }
             else {
+                p->error = request_unsupported_cmd;
                 p->state = request_error_unsupported_command;
             }
             break;
@@ -53,6 +55,7 @@ request_parser_feed(struct request_parser *p, const uint8_t b) {
                 p->address_type = ipv6;
             }
             else {
+                p->error = request_unsupported_atyp;
                 p->state = request_error_unsupported_addr_type;
             }
             break;
@@ -221,7 +224,7 @@ request_consume(buffer *b, struct request_parser *p, bool *errored) {
 }
 
 extern int
-request_marshall(buffer *b, const uint8_t atyp,
+request_marshall(buffer *b, const uint8_t atyp, const uint8_t reply,
     const uint8_t address[], const uint8_t port[], const uint8_t len) {
     size_t n;
     size_t i = 0;
@@ -230,7 +233,7 @@ request_marshall(buffer *b, const uint8_t atyp,
         return -1;
     }
     buff[0] = 0x05;
-    buff[1] = 0x00;
+    buff[1] = reply;
     buff[2] = 0x00;
     buff[3] = atyp;
     for(;i < len; i++) {
