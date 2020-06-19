@@ -21,16 +21,19 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <arpa/inet.h>
 #include "socks5.h"
 #include "selector.h"
+#include "args.h"
 
 #define MAX_CONNECTIONS 1024  // should be larger than max_clients*2
 #define MAX_CLIENTS 500
 
-int total_connections;
-int active_connections;
+unsigned long total_connections;
+unsigned int active_connections;
 unsigned long transferred_bytes;
-int max_clients;
+unsigned int max_clients;
+bool disectors_enabled;
 
 static bool done = false;
 
@@ -39,29 +42,31 @@ static void sigterm_handler(const int signal) {
     done = true;
 }
 
-int main(const int argc, const char **argv) {
+void register_users(struct users* users)
+{
+  FILE* f = fopen("users.txt", "w");
+  for(int i=0; i < MAX_USERS; i++)
+  {
+    if(users[i].name != NULL && users[i].pass != NULL)
+    {
+      fprintf(f, "%s:%s\n", users[i].name, users[i].pass);
+    }
+  }
+  fclose(f);
+}
+
+int main(const int argc, char **argv) {
     total_connections = 0;
     active_connections = 0;
     transferred_bytes = 0;
     max_clients = MAX_CLIENTS;
-    unsigned port = 1080;
 
-    // PARSE ARGS
-    if(argc == 1) {
-        // utilizamos el default
-    } else if(argc == 2) {
-        char *end     = 0;
-        const long sl = strtol(argv[1], &end, 10);
-
-        if (end == argv[1]|| '\0' != *end || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno) || sl < 0 || sl > USHRT_MAX) {
-            fprintf(stderr, "port should be an integer: %s\n", argv[1]);
-            return 1;
-        }
-        port = sl;
-    } else {
-        fprintf(stderr, "Usage: %s <port>\n", argv[0]);
-        return 1;
-    }
+    struct socks5args* args = malloc(sizeof(struct socks5args));
+    parse_args(argc, argv, args);
+    fprintf(stdout, "El manager está en %s:%d\n", args->mng_addr, args->mng_port);
+    fprintf(stdout, "El DoH está en %s:%d y es el host %s\n", args->doh.ip, args->doh.port, args->doh.host);
+    register_users(args->users);
+    disectors_enabled = args->disectors_enabled;
 
     // no tenemos nada que leer de stdin
     close(0);
@@ -73,8 +78,8 @@ int main(const int argc, const char **argv) {
     struct sockaddr_in addr;
     memset(&addr, 0, sizeof(addr));
     addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = htonl(INADDR_ANY);
-    addr.sin_port = htons(port);
+    addr.sin_addr.s_addr = inet_addr(args->socks_addr);
+    addr.sin_port = htons(args->socks_port);
 
     // CREAMOS EL SOCKET PASIVO
     const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
@@ -82,7 +87,7 @@ int main(const int argc, const char **argv) {
         err_msg = "unable to create socket";
         goto finally;
     }
-    fprintf(stdout, "Listening on TCP port %d\n", port);
+    fprintf(stdout, "Listening on TCP port %d\n", args->socks_port);
 
     // man 7 ip. no importa reportar nada si falla.
     setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
