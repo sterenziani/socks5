@@ -24,12 +24,14 @@
 #include "DOH/doh.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
+#define MIN_BUFFER_SIZE 64
 
 extern unsigned long total_connections;
 extern unsigned int active_connections;
 extern unsigned long transferred_bytes;
 extern unsigned int max_clients;
 extern bool disectors_enabled;
+extern unsigned int buffer_size;
 
 static const struct state_definition client_statbl[];
 
@@ -170,13 +172,13 @@ struct socks5 {
       struct pop3_parser pop3;
     } parser;
 
-    uint8_t communication_buffer_a[2048];
-    uint8_t communication_buffer_b[2048];
+    uint8_t communication_buffer_a[MAX_BUFFER_SIZE];
+    uint8_t communication_buffer_b[MAX_BUFFER_SIZE];
     buffer client_read_buffer;
     buffer client_write_buffer;
 
-    uint8_t communication_buffer_x[2048];
-    uint8_t communication_buffer_y[2048];
+    uint8_t communication_buffer_x[MAX_BUFFER_SIZE];
+    uint8_t communication_buffer_y[MAX_BUFFER_SIZE];
     buffer origin_read_buffer;
     buffer origin_write_buffer;
 
@@ -211,10 +213,16 @@ static struct socks5* socks5_new(int fd)
   }
   memset(ret, 0x00, sizeof(*ret));
   ret->client_fd = fd;
-  buffer_init(&ret->client_read_buffer, N(ret->communication_buffer_a), ret->communication_buffer_a);
-  buffer_init(&ret->client_write_buffer, N(ret->communication_buffer_b), ret->communication_buffer_b);
-  buffer_init(&ret->origin_read_buffer, N(ret->communication_buffer_x), ret->communication_buffer_x);
-  buffer_init(&ret->origin_write_buffer, N(ret->communication_buffer_y), ret->communication_buffer_y);
+  int size = buffer_size;
+  if(size > MAX_BUFFER_SIZE)
+    size = MAX_BUFFER_SIZE;
+  else if(buffer_size < MIN_BUFFER_SIZE)
+    size = MIN_BUFFER_SIZE;
+  fprintf(stdout, "El buffer_size vale %d\n", size);
+  buffer_init(&ret->client_read_buffer, size, ret->communication_buffer_a);
+  buffer_init(&ret->client_write_buffer, size, ret->communication_buffer_b);
+  buffer_init(&ret->origin_read_buffer, size, ret->communication_buffer_x);
+  buffer_init(&ret->origin_write_buffer, size, ret->communication_buffer_y);
   ret->stm.initial   = HELLO_READ;
   ret->stm.max_state = ERROR;
   ret->stm.states = client_statbl;

@@ -34,6 +34,7 @@ unsigned int active_connections;
 unsigned long transferred_bytes;
 unsigned int max_clients;
 bool disectors_enabled;
+unsigned int buffer_size;
 
 static bool done = false;
 
@@ -60,6 +61,7 @@ int main(const int argc, char **argv) {
     active_connections = 0;
     transferred_bytes = 0;
     max_clients = MAX_CLIENTS;
+    buffer_size = 2046;
 
     struct socks5args* args = malloc(sizeof(struct socks5args));
     parse_args(argc, argv, args);
@@ -149,6 +151,7 @@ int main(const int argc, char **argv) {
             goto finally;
         }
     }
+    free(args);
     if(err_msg == NULL) {
         err_msg = "closing";
     }
