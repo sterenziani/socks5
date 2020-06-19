@@ -30,6 +30,8 @@ extern int active_connections;
 extern unsigned long transferred_bytes;
 extern int max_clients;
 
+static const struct state_definition client_statbl[];
+
 /** maquina de estados general */
 enum socks_v5state {
     /**
@@ -189,8 +191,6 @@ static const unsigned max_pool = 50;
 static unsigned pool_size = 0;
 static struct socks5* pool = 0;
 
-static const struct state_definition* socks5_describe_states(void);
-
 static struct socks5* socks5_new(int fd)
 {
   if(active_connections >= max_clients)
@@ -217,7 +217,7 @@ static struct socks5* socks5_new(int fd)
   buffer_init(&ret->origin_write_buffer, N(ret->communication_buffer_y), ret->communication_buffer_y);
   ret->stm.initial   = HELLO_READ;
   ret->stm.max_state = ERROR;
-  ret->stm.states = socks5_describe_states();
+  ret->stm.states = client_statbl;
   stm_init(&ret->stm);
   ret->references = 1;
   ret->active = true;
@@ -231,9 +231,17 @@ finally:
 static void socks5_destroy_(struct socks5* s) {
     if(s->origin_resolution != NULL) {
         freeaddrinfo(s->origin_resolution);
-        s->origin_resolution = 0;
+        s->origin_resolution = NULL;
     }
-    free(s);
+    if(s->active)
+    {
+      s->active = false;
+    }
+    else
+    {
+      free(s);
+      s = NULL;
+    }
 }
 
 /**
@@ -615,7 +623,6 @@ static void * request_resolve(void *data){
     solveDomain(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family == AF_UNSPEC)
     {
-      fprintf(stdout, "Es unspec!\n");
       sock->origin_resolution = sock->origin_resolution->ai_next;
     }
     if(sock->origin_resolution == NULL)
@@ -623,7 +630,6 @@ static void * request_resolve(void *data){
       fprintf(stdout, "Es null\n");
       return 0;
     }
-    fprintf(stdout, "Sin Addr: %u\n", ((struct sockaddr_in*)(sock->origin_resolution->ai_addr))->sin_addr.s_addr);
     */
     getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     selector_notify_block(key->s, key->fd);
@@ -993,8 +999,10 @@ void disect_password(struct socks5* sock, buffer* b)
       free(timestamp);
     }
   }
-  if(! sock->needed_resolve)
+  if(!sock->needed_resolve)
+  {
     free(s);
+  }
 }
 
 static unsigned copy_read(struct selector_key *key) {
@@ -1170,10 +1178,6 @@ static const struct state_definition client_statbl[] = {
       .on_read_ready    = NULL,
     }
 };
-
-static const struct state_definition* socks5_describe_states(void) {
-    return client_statbl;
-}
 
 
 ///////////////////////////////////////////////////////////////////////////////
