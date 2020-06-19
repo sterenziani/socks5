@@ -184,7 +184,6 @@ struct socks5 {
     bool needed_resolve;
     unsigned references;
     struct socks5* next;
-    bool active;
 };
 
 static const unsigned max_pool = 50;
@@ -220,7 +219,6 @@ static struct socks5* socks5_new(int fd)
   ret->stm.states = client_statbl;
   stm_init(&ret->stm);
   ret->references = 1;
-  ret->active = true;
   ret->needed_resolve = false;
 
 finally:
@@ -233,15 +231,7 @@ static void socks5_destroy_(struct socks5* s) {
         freeaddrinfo(s->origin_resolution);
         s->origin_resolution = NULL;
     }
-    if(s->active)
-    {
-      s->active = false;
-    }
-    else
-    {
-      free(s);
-      s = NULL;
-    }
+    free(s);
 }
 
 /**
@@ -249,26 +239,24 @@ static void socks5_destroy_(struct socks5* s) {
  * y el pool de objetos.
  */
 static void socks5_destroy(struct socks5* s) {
-    if(s == NULL) {
+    if(s == NULL)
+    {
         // nada para hacer
-    } else if(s->references == 1) {
-        if(s != NULL) {
-            if(pool_size < max_pool) {
-              if(s->active)
-              {
-                s->active = false;
-                s->next = pool;
-                pool = s;
-                pool_size++;
-                freeaddrinfo(s->origin_resolution);
-              }
-            } else {
-                socks5_destroy_(s);
-            }
-        }
-    } else {
-        s->references -= 1;
     }
+    else if(s->references == 1)
+    {
+        if(pool_size < max_pool)
+        {
+            s->next = pool;
+            pool = s;
+            pool_size++;
+            freeaddrinfo(s->origin_resolution);
+        }
+        else
+            socks5_destroy_(s);
+    }
+    else
+      s->references -= 1;
 }
 
 void socksv5_pool_destroy(void) {
@@ -700,6 +688,7 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
               else
                 d->parser.error = request_connection_fail;
             }
+            sock->references++;
             sock->origin_port = ntohs(address.sin_port);
             initialize_communication_parser(sock);
             char* timestamp = time_stamp();
@@ -747,6 +736,7 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
             else
               d->parser.error = request_connection_fail;
           }
+          sock->references++;
           sock->origin_port = ntohs(address.sin6_port);
           initialize_communication_parser(sock);
           char* timestamp = time_stamp();
@@ -851,7 +841,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
         if(SELECTOR_SUCCESS != st) {
           goto finally;
         }
-        sock->references += 1;
       }
       else
         d->parser.error = request_connection_fail;
@@ -859,6 +848,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
       fprintf(stdout, "ERROR!\n");
       abort();
     }
+    sock->references++;
     initialize_communication_parser(sock);
   }
   else{
