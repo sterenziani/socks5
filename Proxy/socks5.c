@@ -549,12 +549,17 @@ static unsigned request_write(struct selector_key *key) {
     size_t  count;
     uint8_t len, fam;
     if(d->parser.error != request_success) {
-      uint8_t ip[16] = {0};
+      uint8_t ip[4] = {0};
       uint8_t port[2] = {0};
-      if(request_marshall(d->wb, ipv4, d->parser.error, ip, port, 16)<0){
+      if(request_marshall(d->wb, ipv4, d->parser.error, ip, port, 4) < 0){
         abort();
       }
-    return ERROR;
+      uint8_t *ptr = buffer_read_ptr(d->wb, &count);
+      size_t n = send(sock->client_fd, ptr, count, MSG_DONTWAIT);
+      if(n < 10) {
+        abort();
+      }
+      return ERROR;
     }
 
     if(sock->origin_addr_storage.ss_family == AF_INET6)
@@ -619,9 +624,9 @@ static void * request_resolve(void *data){
     };
     char buff[7];
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
-    /*
+/*
     solveDomain(sock->origin_addr, buff, &hints, &sock->origin_resolution);
-    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family == AF_UNSPEC)
+    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
     {
       sock->origin_resolution = sock->origin_resolution->ai_next;
     }
@@ -630,7 +635,7 @@ static void * request_resolve(void *data){
       fprintf(stdout, "Es null\n");
       return 0;
     }
-    */
+*/
     getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     selector_notify_block(key->s, key->fd);
     free(data);
@@ -661,7 +666,7 @@ void initialize_communication_parser(struct socks5* sock)
   }
 }
 
-static unsigned request_process(const struct request_st* d, struct selector_key *key) {
+static unsigned request_process(struct request_st* d, struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     unsigned ret = REQUEST_WRITE;
     uint8_t port[2] = {d->parser.port[0], d->parser.port[1]};
@@ -692,17 +697,20 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
                   return ERROR;
                 }
               }
+              else
+                d->parser.error = request_connection_fail;
             }
             sock->origin_port = ntohs(address.sin_port);
             initialize_communication_parser(sock);
             char* timestamp = time_stamp();
             if(strlen(sock->username) > 0)
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
             else
             {
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port));
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
             }
             free(timestamp);
+            selector_register(key->s, sock->origin_fd, &socks5_handler, OP_NOOP, sock);
         }
         else if(d->parser.address_type == domain)
         {
@@ -736,15 +744,18 @@ static unsigned request_process(const struct request_st* d, struct selector_key 
                 return ERROR;
               }
             }
+            else
+              d->parser.error = request_connection_fail;
           }
           sock->origin_port = ntohs(address.sin6_port);
           initialize_communication_parser(sock);
           char* timestamp = time_stamp();
           if(strlen(sock->username) > 0)
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
           else
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t{estado}\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port));
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
           free(timestamp);
+          selector_register(key->s, sock->origin_fd, &socks5_handler, OP_NOOP, sock);
         }
         break;
       case req_bind:
@@ -813,44 +824,57 @@ static void request_resolve_init(const unsigned state, struct selector_key *key)
 
 static unsigned request_connect(struct selector_key *key, struct socks5* sock)
 {
-  sock->origin_fd = socket(sock->origin_resolution->ai_family, SOCK_STREAM, 0);
-  if (sock->origin_fd == -1) {
-    goto finally;
-  }
-  if (selector_fd_set_nio(sock->origin_fd) == -1) {
-    goto finally;
-  }
-  if (-1 == connect(sock->origin_fd, (const struct sockaddr *) &sock->origin_addr_storage, sock->origin_resolution->ai_addrlen))
-  {
-    if(errno == EINPROGRESS) {
-      selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
-      if(SELECTOR_SUCCESS != st) {
-        goto finally;
-      }
-      st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
-      if(SELECTOR_SUCCESS != st) {
-        goto finally;
-      }
-      sock->references += 1;
-    }
-  } else {
-    fprintf(stdout, "ERROR!\n");
-    abort();
-  }
-  initialize_communication_parser(sock);
+  struct request_st *d = &ATTACHMENT(key)->client.request;
   char* s = NULL;
   char* user = NULL;
   if(strlen(sock->username) > 0)
     user = sock->username;
   else
     user = "ANON";
+  if(d->parser.error == request_success)
+  {
+    sock->origin_fd = socket(sock->origin_resolution->ai_family, SOCK_STREAM, 0);
+    if (sock->origin_fd == -1) {
+      goto finally;
+    }
+    if (selector_fd_set_nio(sock->origin_fd) == -1) {
+      goto finally;
+    }
+    if (-1 == connect(sock->origin_fd, (const struct sockaddr *) &sock->origin_addr_storage, sock->origin_resolution->ai_addrlen))
+    {
+      if(errno == EINPROGRESS) {
+        selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+        if(SELECTOR_SUCCESS != st) {
+          goto finally;
+        }
+        st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
+        if(SELECTOR_SUCCESS != st) {
+          goto finally;
+        }
+        sock->references += 1;
+      }
+      else
+        d->parser.error = request_connection_fail;
+    } else {
+      fprintf(stdout, "ERROR!\n");
+      abort();
+    }
+    initialize_communication_parser(sock);
+  }
+  else{
+    char* timestamp = time_stamp();
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, sock->origin_port, d->parser.error);
+    free(timestamp);
+    selector_set_interest(key->s, sock->client_fd, OP_WRITE);
+    return REQUEST_WRITE;
+  }
 
   if(sock->origin_resolution->ai_family == AF_INET)
   {
     s = malloc(INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
     char* timestamp = time_stamp();
-    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
     free(s);
     free(timestamp);
   }
@@ -859,7 +883,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     s = malloc(INET6_ADDRSTRLEN);
     inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->origin_addr_storage))->sin6_addr, s, INET6_ADDRSTRLEN);
     char* timestamp = time_stamp();
-    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t{estado}\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port);
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
     free(s);
     free(timestamp);
   }
@@ -874,17 +898,19 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
 
 static unsigned request_resolve_done(struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
+    struct request_st *d = &ATTACHMENT(key)->client.request;
     if(sock->origin_resolution == NULL)
     {
       fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
       freeaddrinfo(sock->origin_resolution);
       sock->origin_resolution = 0;
-      return ERROR;
+      d->parser.error = request_connection_fail;
     }
     else
     {
       memcpy(&sock->origin_addr_storage, sock->origin_resolution->ai_addr, sock->origin_resolution->ai_addrlen);
     }
+    selector_register(key->s, sock->origin_fd, &socks5_handler, OP_NOOP, sock);
     return request_connect(key, sock);
 }
 
@@ -900,7 +926,7 @@ static void copy_init(const unsigned state, struct selector_key *key) {
     d_orig->rb                              = &(ATTACHMENT(key)->origin_read_buffer);
     d_orig->wb                              = &(ATTACHMENT(key)->origin_write_buffer);
     struct socks5 *sock = ATTACHMENT(key);
-    selector_register(key->s, sock->origin_fd, &socks5_handler, OP_READ, sock);
+    selector_set_interest(key->s, sock->origin_fd, OP_READ);
 }
 
 static void copy_close(const unsigned state, struct selector_key *key){
@@ -1227,8 +1253,10 @@ static void socksv5_done(struct selector_key* key) {
     for(unsigned i = 0; i < N(fds); i++)
     {
       if(fds[i] != -1 && fds[i] != 0) {
-        if(SELECTOR_SUCCESS != selector_unregister_fd(key->s, fds[i]))
+        int a = selector_unregister_fd(key->s, fds[i]);
+        if(SELECTOR_SUCCESS != a)
         {
+          fprintf(stderr, "Couldn't unsuscribe from fd %d! Errno is %d\n", fds[i], a);
           abort();
         }
         close(fds[i]);
