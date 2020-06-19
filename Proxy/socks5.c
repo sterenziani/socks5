@@ -25,10 +25,10 @@
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 
-extern int total_connections;
-extern int active_connections;
-extern unsigned long transferred_bytes;
-extern int max_clients;
+int total_connections;
+int active_connections;
+unsigned long transferred_bytes;
+int max_clients;
 
 static const struct state_definition client_statbl[];
 

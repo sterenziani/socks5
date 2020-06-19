@@ -3,6 +3,10 @@
 
 #include <netinet/in.h>
 
+#ifdef __APPLE__
+    #define MSG_NOSIGNAL 0
+#endif
+
 #include "buffer.h"
 
 #define SOCKADDR_TO_HUMAN_MIN (INET6_ADDRSTRLEN + 5 + 1)
