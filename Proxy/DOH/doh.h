@@ -69,4 +69,7 @@ sendHttpMessage(int fd, buffer *request);
 int
 feedParser(struct parser_doh *p, buffer *b);
 
+void
+freedohinfo(struct addrinfo *res);
+
 #endif // DOH_H_

@@ -86,7 +86,7 @@ void test_ipv4(void){
   printf("doh_test/connect_ipv4:\tsuccess!\n");
 
   shutdown(sockfd, SHUT_RDWR);
-  freeaddrinfo(res_doh);
+  freedohinfo(res_doh);
 
   return;
 }
@@ -123,7 +123,7 @@ void test_ipv6(void){
   }
 
   shutdown(sockfd, SHUT_RDWR);
-  freeaddrinfo(res_doh);
+  freedohinfo(res_doh);
 
   return;
 }

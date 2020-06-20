@@ -397,3 +397,16 @@ feedParser(struct parser_doh *p, buffer *b){
   buffer_reset(b);
   return 0;
 }
+
+void
+freedohinfo(struct addrinfo *res){
+  struct addrinfo *aux;
+  while(res != NULL){
+    if(res->ai_family == AF_INET || res->ai_family == AF_INET6){
+      free(res->ai_addr);
+    }
+    aux = res;
+    res = res->ai_next;
+    free(aux);
+  }
+}

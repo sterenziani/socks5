@@ -6,7 +6,7 @@
 #include <sys/types.h>
 
 #include "../Proxy/buffer.h"
-#include "../Proxy/parser.h"
+#include "../Proxy/DOH/parser.h"
 #include "../Proxy/DOH/parser_num.h"
 #include "../Proxy/DOH/parser_doh.h"
 #include "../Proxy/DOH/parser_http.h"
