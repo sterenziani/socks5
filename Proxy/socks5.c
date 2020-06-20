@@ -605,10 +605,6 @@ static void * request_resolve(void *data){
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
 
     solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
-    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
-    {
-      sock->origin_resolution = sock->origin_resolution->ai_next;
-    }
 
     //getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     selector_notify_block(key->s, key->fd);
@@ -878,6 +874,14 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
 static unsigned request_resolve_done(struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     struct request_st *d = &ATTACHMENT(key)->client.request;
+    struct addrinfo* p;
+    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
+    {
+      p = sock->origin_resolution;
+      sock->origin_resolution = sock->origin_resolution->ai_next;
+      p->ai_next = NULL;
+      freeaddrinfo(p);
+    }
     if(sock->origin_resolution == NULL)
     {
       fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
