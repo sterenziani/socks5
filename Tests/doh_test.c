@@ -44,7 +44,7 @@ void test_ipv4(void){
 	hints.ai_family = AF_INET;
 	hints.ai_socktype = SOCK_STREAM;
 
-  ssize_t result = solveDomain(HOST,PORT,&hints,&res_doh);
+  ssize_t result = solveDomain(NULL,HOST,PORT,&hints,&res_doh);
   assert(result==0);
   printf("doh_test/returns_ipv4:\tsuccess!\n");
 
@@ -91,7 +91,7 @@ void test_ipv6(void){
   // IPv6
 
   hints.ai_family = AF_INET6;
-  ssize_t result = solveDomain(HOST,PORT,&hints,&res_doh);
+  ssize_t result = solveDomain(NULL,HOST,PORT,&hints,&res_doh);
   assert(result==0);
   printf("doh_test/returns_ipv6:\tsuccess!\n");
 

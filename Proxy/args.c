@@ -6,6 +6,7 @@
 #include <getopt.h>
 
 #include "args.h"
+#include "DOH/doh.h"
 
 static unsigned short
 port(const char *s) {

@@ -7,11 +7,16 @@
 
 // main function
 size_t
-solveDomain(const char* host, const char* port, struct addrinfo *hints, struct addrinfo **ret_addrInfo)
+solveDomain(const struct doh* dohAddr, const char* host, const char* port, struct addrinfo *hints, struct addrinfo **ret_addrInfo)
 {
   int sockfd;
-  struct sockaddr_in server;
-  getDohServer(&server);
+  struct sockaddr_storage server;
+  const struct doh* doh_curr = (dohAddr==NULL)?&defaultDoh:dohAddr;
+
+  if(getDohServer(doh_curr, &server)!=0){
+    perror("invalid doh address");
+    return -1;
+  }
 
   //  to ignore sigpipe
   signal(SIGPIPE, SIG_IGN);
@@ -29,7 +34,7 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   timeout.tv_nsec = 0;
 
   // create a socket
-  sockfd = socket(ADDRESS_TYPE, SOCK_STREAM, 0);
+  sockfd = socket(server.ss_family, SOCK_STREAM, 0);
   if(sockfd<0){
     perror("Socket opening failed!\n");
     return -1;
@@ -42,10 +47,8 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   FD_SET(sockfd,&socketSet);
 
   // connect to socket
-	if (connect(sockfd, (struct sockaddr *)&server, sizeof(server)) < 0 && errno != EINPROGRESS){
-    char errno_str[BUFFER_MAX];
-    snprintf(errno_str, sizeof errno_str, "Connection failed: errno %d\n", (int) errno);
-		perror(errno_str);
+	if (connect(sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr)) < 0 && errno != EINPROGRESS){
+		perror("Connection failed");
     shutdown(sockfd, SHUT_RDWR);
 		return -1;
 	} else if(errno == EINPROGRESS) {
@@ -87,8 +90,6 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
 
 
   // make http request
-  char server_str[BUFFER_MAX];
-  snprintf(server_str, sizeof server_str, "%s:%zu",ADDRESS, (size_t) ADDRESS_PORT);
 
   //create request buffer
   struct buffer request;
@@ -96,7 +97,7 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
   uint8_t direct_buff_req[BUFFER_MAX];
   buffer_init(&request, N(direct_buff_req), direct_buff_req);
 
-  if(httpEncode(server_str, req, m, contentLength_str) < 0){
+  if(httpEncode(doh_curr, req, m, contentLength_str) < 0){
     perror("Encoding http message failed\n");
     shutdown(sockfd, SHUT_RDWR);
     return -1;
@@ -207,13 +208,22 @@ solveDomain(const char* host, const char* port, struct addrinfo *hints, struct a
 	return err;
 }
 
-void
-getDohServer(struct sockaddr_in* server){
+int
+getDohServer(const struct doh* dohAddr, struct sockaddr_storage* server){
   memset((char *) server,0, sizeof(server));
 
-  server->sin_family	= ADDRESS_TYPE;             // host byte order
-  server->sin_port = htons(ADDRESS_PORT);        // assigning the specific port
-  server->sin_addr.s_addr = inet_addr(ADDRESS);  // host address
+  // determino el tipo de address
+  if( inet_pton(AF_INET,dohAddr->ip,&((struct sockaddr_in*)server)->sin_addr.s_addr) ){
+    server->ss_family = AF_INET;
+    ((struct sockaddr_in *)server)->sin_port = htons(dohAddr->port);
+  }else if( inet_pton(AF_INET6,dohAddr->ip,&((struct sockaddr_in6*)server)->sin6_addr.s6_addr) ){
+    server->ss_family = AF_INET6;
+    ((struct sockaddr_in6 *)server)->sin6_port = htons(dohAddr->port);
+  }else{
+    return -1;
+  }
+
+  return 0;
 }
 
 ssize_t
@@ -321,12 +331,17 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
 }
 
 ssize_t
-httpEncode(char* doh, buffer *req, buffer *dnsMessage, char *contentLength){
+httpEncode(const struct doh* dohAddr, buffer *req, buffer *dnsMessage, char *contentLength){
+
+  char host_str[BUFFER_MAX];
+  snprintf(host_str, sizeof host_str, "%s:%hu",dohAddr->host, dohAddr->port);
 
   buffer_reset(req);
 
-  buffer_write_string(req,"POST /dns-query HTTP/1.1\r\nHost: ");
-  buffer_write_string(req,doh);
+  buffer_write_string(req,"POST ");
+  buffer_write_string(req,dohAddr->path);
+  buffer_write_string(req," HTTP/1.1\r\nHost: ");
+  buffer_write_string(req,host_str);
   buffer_write_string(req,"\r\n");  // modifiy later to sprintf
   buffer_write_string(req,"Content-Type: application/dns-message\r\n");
   buffer_write_string(req,"Accept: application/dns-message\r\n");
