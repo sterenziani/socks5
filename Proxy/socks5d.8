@@ -41,7 +41,7 @@ Establece el valor del header Host.
 Por defecto \fIlocalhost\fR.
 .IP "\fB\--doh-path\fB \fIpath\fR"
 establece el path del request doh.
-por defecto \fI/getnsrecord\fR.
+por defecto \fI/dns-query\fR.
 .IP "\fB\--doh-query\fB \fIquery\fR"
 establece el query string si el request DoH utiliza el método Doh
 por defecto \fI?dns=\fR.
@@ -53,7 +53,7 @@ Imprime la ayuda y termina.
 
 .IP "\fB\-l\fB \fIdirección-http\fR"
 Establece la dirección donde servirá el proxy SOCKS.
-Por defecto escucha en todas las interfaces. 
+Por defecto escucha en todas las interfaces.
 
 .IP "\fB\-N\fB"
 Deshabilita los passwords disectors.
@@ -83,22 +83,22 @@ Imprime información sobre la versión versión y termina.
 Registra el uso del proxy en salida estandar. Una conexión por línea. Los campos de una
 línea separado por tabs:
 
-.IP "\fBfecha\fR" 
+.IP "\fBfecha\fR"
 que se procesó la conexión en formato ISO-8601.
 Ejemplo 2020-06-15T19:56:34Z.
 
-.IP "\fBnombre de usuario\fR" 
+.IP "\fBnombre de usuario\fR"
 que hace el requerimiento.
 Ejemplo juan.
 
-.IP "\fBtipo de registro\fR" 
+.IP "\fBtipo de registro\fR"
 Siempre el caracter A.
 
-.IP "\fBdireccion IP origen\fR" 
+.IP "\fBdireccion IP origen\fR"
 desde donde se conectó el usuario.
 Ejemplo ::1.
 
-.IP "\fBpuerto origen\fR" 
+.IP "\fBpuerto origen\fR"
 desde donde se conectó el usuario.
 Ejemplo 54786.
 
@@ -119,15 +119,15 @@ Ejemplo 0.
 Registra las credenciales descubiertas en salida estandar. Una credencial por línea.
 Los campos de una línea separados por tabs:
 
-.IP "\fBfecha\fR" 
+.IP "\fBfecha\fR"
 que se procesó la conexión en formato ISO-8601.
 Ejemplo 2020-06-15T19:56:34Z.
 
-.IP "\fBnombre de usuario\fR" 
+.IP "\fBnombre de usuario\fR"
 que hace el requerimiento.
 Ejemplo juan.
 
-.IP "\fBtipo de registro\fR" 
+.IP "\fBtipo de registro\fR"
 Siempre el caracter P.
 
 
@@ -147,4 +147,3 @@ Usuario descubierto.
 
 .IP "\fBpassword\fR"
 Password descubierta.
-

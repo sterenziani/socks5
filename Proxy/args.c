@@ -6,6 +6,7 @@
 #include <getopt.h>
 
 #include "args.h"
+#include "DOH/doh.h"
 
 static unsigned short
 port(const char *s) {
@@ -39,7 +40,7 @@ user(char *s, struct users *user) {
 
 static void
 version(void) {
-    fprintf(stderr, "socks5v version 0.0\n"
+    fprintf(stderr, "socksv5 version 1.0\n"
                     "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
                     "AQUI VA LA LICENCIA\n");
 }
@@ -68,7 +69,7 @@ usage(const char *progname) {
     exit(1);
 }
 
-void 
+void
 parse_args(const int argc, char **argv, struct socks5args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
@@ -83,7 +84,7 @@ parse_args(const int argc, char **argv, struct socks5args *args) {
     args->doh.host = "localhost";
     args->doh.ip   = "127.0.0.1";
     args->doh.port = 8053;
-    args->doh.path = "/getnsrecord";
+    args->doh.path = "/dns-query";
     args->doh.query = "?dns=";
 
     int c;

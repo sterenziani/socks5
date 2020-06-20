@@ -3,13 +3,12 @@
 ##
 
 # Variables para compilador C
-CC=clang
-CCFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
+CFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
-DEPS=$(DIR)/buffer.h $(DIR)/parser.h $(DIR)/parser_utils.h $(DOH_DIR)/doh.h $(DOH_DIR)/parser_num.h $(DOH_DIR)/parser_http.h $(DOH_DIR)/parser_doh.h
+DEPS= $(wildcard $(DOH_DIR)/*.h) $(wildcard $(DIR)/*.h)
 OBJ=$(DEPS:.h=.o)
 
 # Variables para doh Server
@@ -34,12 +33,12 @@ doh-start: doh-stop
 	$(DOCKER) run --name $(DOH_CONTAINER) -d -p $(DOH_PORT):80 $(DOH_IMAGE)
 
 %.o: %.c $(DEPS)
-	$(CC) -c -o $@ $< $(CCFLAGS)
+	$(CC) -c -o $@ $< $(CFLAGS)
 
 # Tests
 $(TEST_DIR)/%_test: $(OBJ)
-	$(CC) -c -o $@.o $(CCFLAGS) $@.c
-	$(CC) -o $@ $^ $@.o $(CCFLAGS)
+	$(CC) -c -o $@.o $(CFLAGS) $@.c
+	$(CC) -o $@ $^ $@.o $(CFLAGS)
 	rm -rf $@.o
 
 .PHONY: tests
