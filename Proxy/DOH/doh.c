@@ -28,11 +28,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   sigaddset(&blockset, SIGPIPE);
   sigprocmask(SIG_BLOCK, &blockset, NULL);
 
-  // timeout time
-  struct timespec timeout;
-  timeout.tv_sec = TIMEOUT_SEC;
-  timeout.tv_nsec = 0;
-
   // create a socket
   sockfd = socket(server.ss_family, SOCK_STREAM, 0);
   if(sockfd<0){
@@ -52,7 +47,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     shutdown(sockfd, SHUT_RDWR);
 		return -1;
 	} else if(errno == EINPROGRESS) {
-    if(pselect(sockfd+1,NULL,&socketSet,NULL,&timeout,&blockset)==-1){
+    if(pselect(sockfd+1,NULL,&socketSet,NULL,&doh_timeout,&blockset)==-1){
       perror("Select error");
       shutdown(sockfd, SHUT_RDWR);
       return -1;
@@ -132,7 +127,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       return -1;
     }
 
-    if(pselect(sockfd+1,&socketSet,NULL,NULL,&timeout,&blockset)==-1){
+    if(pselect(sockfd+1,&socketSet,NULL,NULL,&doh_timeout,&blockset)==-1){
       perror("Select error");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);

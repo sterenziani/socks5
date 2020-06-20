@@ -41,6 +41,13 @@ static struct doh defaultDoh = {
   .query  = "?dns=",
 };
 
+// doh_timeout time
+static struct timespec doh_timeout = {
+  .tv_sec = TIMEOUT_SEC,
+  .tv_nsec = 0,
+};
+
+
 // funciones principales
 
 // resuelve el nombre

@@ -29,6 +29,8 @@
 #define MAX_CONNECTIONS 1024  // should be larger than max_clients*2
 #define MAX_CLIENTS 500
 
+#define DEFAULT_SELECTOR_TIMEOUT 10
+
 unsigned long total_connections;
 unsigned int active_connections;
 unsigned long transferred_bytes;
@@ -119,7 +121,7 @@ int main(const int argc, char **argv) {
     const struct selector_init conf = {
         .signal = SIGALRM,
         .select_timeout = {
-            .tv_sec  = 10,
+            .tv_sec  = DEFAULT_SELECTOR_TIMEOUT,
             .tv_nsec = 0,
         },
     };
