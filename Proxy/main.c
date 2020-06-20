@@ -44,17 +44,20 @@ static void sigterm_handler(const int signal) {
     done = true;
 }
 
-void register_users(struct users* users)
+char* registered_users[MAX_USERS][2];
+
+void register_users(struct users* users, char* registered_users[MAX_USERS][2])
 {
-  FILE* f = fopen("users.txt", "w");
   for(int i=0; i < MAX_USERS; i++)
   {
     if(users[i].name != NULL && users[i].pass != NULL)
     {
-      fprintf(f, "%s:%s\n", users[i].name, users[i].pass);
+      registered_users[i][0] = malloc(256*sizeof(char));
+      memcpy(registered_users[i][0], users[i].name, strlen(users[i].name));
+      registered_users[i][1] = malloc(256*sizeof(char));
+      memcpy(registered_users[i][1], users[i].pass, strlen(users[i].pass));
     }
   }
-  fclose(f);
 }
 
 int main(const int argc, char **argv) {
@@ -68,7 +71,8 @@ int main(const int argc, char **argv) {
     parse_args(argc, argv, args);
     fprintf(stdout, "El manager está en %s:%d\n", args->mng_addr, args->mng_port);
     fprintf(stdout, "El DoH está en %s:%d y es el host %s\n", args->doh.ip, args->doh.port, args->doh.host);
-    register_users(args->users);
+
+    register_users(args->users, registered_users);
     disectors_enabled = args->disectors_enabled;
     doh = &(args->doh);
 
