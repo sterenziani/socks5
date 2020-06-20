@@ -24,9 +24,11 @@ void socksv5_passive_accept(struct selector_key *key);
 void socksv5_pool_destroy(void);
 
 // variables extern
-extern int total_connections;
-extern int active_connections;
+extern unsigned long total_connections;
+extern unsigned int active_connections;
 extern unsigned long transferred_bytes;
-extern int max_clients;
+extern unsigned int max_clients;
+extern bool disectors_enabled;
+extern unsigned int buffer_size;
 
 #endif

@@ -24,11 +24,14 @@
 #include "DOH/doh.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
+#define MIN_BUFFER_SIZE 64
 
-int total_connections;
-int active_connections;
+unsigned long total_connections;
+unsigned int active_connections;
 unsigned long transferred_bytes;
-int max_clients;
+unsigned int max_clients;
+bool disectors_enabled;
+unsigned int buffer_size;
 
 static const struct state_definition client_statbl[];
 
@@ -169,13 +172,13 @@ struct socks5 {
       struct pop3_parser pop3;
     } parser;
 
-    uint8_t communication_buffer_a[2048];
-    uint8_t communication_buffer_b[2048];
+    uint8_t communication_buffer_a[MAX_BUFFER_SIZE];
+    uint8_t communication_buffer_b[MAX_BUFFER_SIZE];
     buffer client_read_buffer;
     buffer client_write_buffer;
 
-    uint8_t communication_buffer_x[2048];
-    uint8_t communication_buffer_y[2048];
+    uint8_t communication_buffer_x[MAX_BUFFER_SIZE];
+    uint8_t communication_buffer_y[MAX_BUFFER_SIZE];
     buffer origin_read_buffer;
     buffer origin_write_buffer;
 
@@ -186,7 +189,7 @@ struct socks5 {
     struct socks5* next;
 };
 
-static const unsigned max_pool = 50;
+static const uint8_t max_pool = 50;
 static unsigned pool_size = 0;
 static struct socks5* pool = 0;
 
@@ -210,10 +213,16 @@ static struct socks5* socks5_new(int fd)
   }
   memset(ret, 0x00, sizeof(*ret));
   ret->client_fd = fd;
-  buffer_init(&ret->client_read_buffer, N(ret->communication_buffer_a), ret->communication_buffer_a);
-  buffer_init(&ret->client_write_buffer, N(ret->communication_buffer_b), ret->communication_buffer_b);
-  buffer_init(&ret->origin_read_buffer, N(ret->communication_buffer_x), ret->communication_buffer_x);
-  buffer_init(&ret->origin_write_buffer, N(ret->communication_buffer_y), ret->communication_buffer_y);
+  int size = buffer_size;
+  if(size > MAX_BUFFER_SIZE)
+    size = MAX_BUFFER_SIZE;
+  else if(buffer_size < MIN_BUFFER_SIZE)
+    size = MIN_BUFFER_SIZE;
+  fprintf(stdout, "El buffer_size vale %d\n", size);
+  buffer_init(&ret->client_read_buffer, size, ret->communication_buffer_a);
+  buffer_init(&ret->client_write_buffer, size, ret->communication_buffer_b);
+  buffer_init(&ret->origin_read_buffer, size, ret->communication_buffer_x);
+  buffer_init(&ret->origin_write_buffer, size, ret->communication_buffer_y);
   ret->stm.initial   = HELLO_READ;
   ret->stm.max_state = ERROR;
   ret->stm.states = client_statbl;
@@ -690,7 +699,8 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
             }
             sock->references++;
             sock->origin_port = ntohs(address.sin_port);
-            initialize_communication_parser(sock);
+            if(disectors_enabled)
+              initialize_communication_parser(sock);
             char* timestamp = time_stamp();
             if(strlen(sock->username) > 0)
               fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
@@ -738,7 +748,8 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
           }
           sock->references++;
           sock->origin_port = ntohs(address.sin6_port);
-          initialize_communication_parser(sock);
+          if(disectors_enabled)
+            initialize_communication_parser(sock);
           char* timestamp = time_stamp();
           if(strlen(sock->username) > 0)
             fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
@@ -849,7 +860,8 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
       abort();
     }
     sock->references++;
-    initialize_communication_parser(sock);
+    if(disectors_enabled)
+      initialize_communication_parser(sock);
   }
   else{
     char* timestamp = time_stamp();
@@ -1043,7 +1055,8 @@ static unsigned copy_read(struct selector_key *key) {
         buffer_write_adv(d_orig->rb, n);
         selector_status st = selector_set_interest(key->s, sock->origin_fd, OP_NOOP);
         // En rb quedo lo que vamos a leer ahora
-        disect_password(sock, d_orig->rb);
+        if(disectors_enabled)
+          disect_password(sock, d_orig->rb);
         st = selector_set_interest(key->s, sock->client_fd, OP_WRITE);
         if(st != SELECTOR_SUCCESS)
         {
@@ -1062,7 +1075,8 @@ static unsigned copy_read(struct selector_key *key) {
         buffer_write_adv(d_cli->rb, n);
         selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
         // En rb quedo lo que vamos a leer ahora
-        disect_password(sock, d_cli->rb);
+        if(disectors_enabled)
+          disect_password(sock, d_cli->rb);
         st = selector_set_interest(key->s, sock->origin_fd, OP_WRITE);
         if(st != SELECTOR_SUCCESS)
         {
