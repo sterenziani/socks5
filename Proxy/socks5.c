@@ -26,7 +26,7 @@
 #define MAX_BUFFER_SIZE 4096
 #define MIN_BUFFER_SIZE 64
 
-static const struct state_definition client_statbl[];
+static const struct state_definition* get_states();
 
 /** maquina de estados general */
 enum socks_v5state {
@@ -217,7 +217,7 @@ static struct socks5* socks5_new(int fd)
   buffer_init(&ret->origin_write_buffer, size, ret->communication_buffer_y);
   ret->stm.initial   = HELLO_READ;
   ret->stm.max_state = ERROR;
-  ret->stm.states = client_statbl;
+  ret->stm.states = get_states();
   stm_init(&ret->stm);
   ret->references = 1;
   ret->needed_resolve = false;
@@ -551,16 +551,6 @@ static unsigned request_write(struct selector_key *key) {
       return ERROR;
     }
 
-    if(sock->origin_addr_storage.ss_family == AF_INET6)
-    {
-      len = 16;
-      fam = ipv6;
-    }
-    else
-    {
-      fam = ipv4;
-      len = 4;
-    }
     if(request_marshall(d->wb, request_success) < 10)
     {
       abort();
@@ -1195,6 +1185,10 @@ static const struct state_definition client_statbl[] = {
       .on_read_ready    = NULL,
     }
 };
+
+static const struct state_definition* get_states(void) {
+    return client_statbl;
+}
 
 
 ///////////////////////////////////////////////////////////////////////////////

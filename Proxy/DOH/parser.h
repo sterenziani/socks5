@@ -12,6 +12,7 @@
  */
 #include <stdint.h>
 #include <stddef.h>
+#define ANY (1 << 9)
 
 typedef struct parser *parser_ptr;
 
@@ -44,7 +45,7 @@ struct parser_state_transition {
 };
 
 /** predicado para utilizar en `when' que retorna siempre true */
-static const unsigned ANY = 1 << 9;
+//static const unsigned ANY = 1 << 9;
 
 /** declaración completa de una máquina de estados */
 struct parser_definition {
