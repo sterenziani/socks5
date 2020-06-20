@@ -35,6 +35,7 @@ unsigned long transferred_bytes;
 unsigned int max_clients;
 bool disectors_enabled;
 unsigned int buffer_size;
+struct doh* doh;
 
 static bool done = false;
 
@@ -69,6 +70,7 @@ int main(const int argc, char **argv) {
     fprintf(stdout, "El DoH está en %s:%d y es el host %s\n", args->doh.ip, args->doh.port, args->doh.host);
     register_users(args->users);
     disectors_enabled = args->disectors_enabled;
+    doh = &(args->doh);
 
     // no tenemos nada que leer de stdin
     close(0);

@@ -30,5 +30,6 @@ extern unsigned long transferred_bytes;
 extern unsigned int max_clients;
 extern bool disectors_enabled;
 extern unsigned int buffer_size;
+extern struct doh* doh;
 
 #endif

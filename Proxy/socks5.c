@@ -26,13 +26,6 @@
 #define MAX_BUFFER_SIZE 4096
 #define MIN_BUFFER_SIZE 64
 
-unsigned long total_connections;
-unsigned int active_connections;
-unsigned long transferred_bytes;
-unsigned int max_clients;
-bool disectors_enabled;
-unsigned int buffer_size;
-
 static const struct state_definition client_statbl[];
 
 /** maquina de estados general */
@@ -218,7 +211,6 @@ static struct socks5* socks5_new(int fd)
     size = MAX_BUFFER_SIZE;
   else if(buffer_size < MIN_BUFFER_SIZE)
     size = MIN_BUFFER_SIZE;
-  fprintf(stdout, "El buffer_size vale %d\n", size);
   buffer_init(&ret->client_read_buffer, size, ret->communication_buffer_a);
   buffer_init(&ret->client_write_buffer, size, ret->communication_buffer_b);
   buffer_init(&ret->origin_read_buffer, size, ret->communication_buffer_x);
@@ -621,8 +613,8 @@ static void * request_resolve(void *data){
     };
     char buff[7];
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
-/*
-    solveDomain(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+
+    solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
     while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
     {
       sock->origin_resolution = sock->origin_resolution->ai_next;
@@ -632,8 +624,8 @@ static void * request_resolve(void *data){
       fprintf(stdout, "Es null\n");
       return 0;
     }
-*/
-    getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+
+    //getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
     selector_notify_block(key->s, key->fd);
     free(data);
     return 0;
