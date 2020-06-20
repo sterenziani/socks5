@@ -119,79 +119,27 @@ void auth_parser_close(struct auth_parser *p){
 // Retorna 0 si el usuario y contraseña son validos. 1 si no lo son.
 int user_pass_valid(const char* u, int ulen, const char* p, int plen)
 {
-  FILE* f = fopen("users.txt", "r");
-  if(f == NULL)
-    return 1;
-  bool searching = true;
-  bool possible = true;
-  int c;
-  int u_counter = 0;
-  int p_counter = 0;
-  while(searching)
+  char* user = malloc(ulen+1);
+  char* pass = malloc(plen+1);
+  memset(user, 0, ulen+1);
+  memset(user, 0, plen+1);
+  memcpy(user, u, ulen);
+  memcpy(pass, p, plen);
+  for(int i=0; i < MAX_USERS; i++)
   {
-    u_counter = 0;
-    p_counter = 0;
-    possible = true;
-    // Empezamos una nueva linea
-    while(possible && u_counter < ulen)
+    if(registered_users[i][0] != NULL && registered_users[i][1] != NULL)
     {
-      c = fgetc(f);
-      if(c == EOF){
-        fclose(f);
-        return 1;
+      fprintf(stdout, "Comparando %s:%s con %s:%s\n", registered_users[i][0], registered_users[i][1], user, pass);
+      if(strcmp(registered_users[i][0], user) == 0 && strcmp(registered_users[i][1], pass) == 0)
+      {
+        free(user);
+        free(pass);
+        return 0;
       }
-      else if(c == u[u_counter]){
-        u_counter++;
-      }
-      else{
-        possible = false;
-      }
-    }
-    // Ya lei al usuario. Si matchea, debería seguir un :
-    if(possible)
-    {
-      if((c = fgetc(f)) != ':')
-        possible = false;
-      if(c == EOF){
-        fclose(f);
-        return 1;
-      }
-    }
-    //El usuario estaba bien y tenia la longitud correcta. Miro la contraseña
-    while(possible && p_counter < plen)
-    {
-      c = fgetc(f);
-      if(c == EOF){
-        fclose(f);
-        return 1;
-      }
-      else if(c == p[p_counter])
-        p_counter++;
-      else
-        possible = false;
-    }
-    // Else, ya lei la contraseña. Si estaba bien, veo que termine ahí.
-    if(possible)
-    {
-      if((c = fgetc(f)) != '\n' && c != EOF)
-        possible = false;
-      else
-        searching = false;
-    }
-    // Si no era posible, me muevo hasta el final de linea
-    else
-    {
-      while(c != '\n' && c != EOF)
-        c = fgetc(f);
     }
   }
-  // Si llegó hasta acá y es possible, es que matcheó.
-  if(possible)
-  {
-    fclose(f);
-    return 0;
-  }
-  fclose(f);
+  free(user);
+  free(pass);
   return 1;
 }
 
