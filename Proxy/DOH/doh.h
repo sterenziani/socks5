@@ -64,6 +64,10 @@ getDohServer(const struct doh* dohAddr, struct sockaddr_storage* server);
 ssize_t
 dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize);
 
+//  recibe un host, el tipo de dns y un buffer, ingresa el Question Section a dicho buffer
+int
+feedQuestion(const char* host, uint8_t qtype1, uint8_t qtype2, buffer *b);
+
 // recibe la dirección de un doh server y un dns message y forma el request http
 ssize_t
 httpEncode(const struct doh* dohAddr, buffer *req, buffer *dnsMessage, char *contentLength);

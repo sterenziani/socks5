@@ -261,7 +261,9 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
             break;
           case DNS_QUESTION_TYPE_AND_CLASS:
             if(p->dnsIndex-p->prev_dnsIndex >= 4){
-              if(p->dnsAnswers>0){
+              if(--p->dnsQuestions){
+                p->status_dns = DNS_QUESTION_NAME;
+              }else if(p->dnsAnswers>0){
                 p->status_dns = DNS_ANSWER_NAME;
                 p->prev_dnsIndex = p->dnsIndex+1;
               }else{

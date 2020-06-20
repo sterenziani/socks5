@@ -224,11 +224,10 @@ getDohServer(const struct doh* dohAddr, struct sockaddr_storage* server){
 ssize_t
 dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
 
-  size_t hostlen = strlen(host);
-  const char *hostPointer = host;
+  uint8_t questions = (dnsType==AF_UNSPEC)?0x02:0x01;
 
   // verificación de lo minimo que debe soportar el paquete
-  if(buffSize < (12 + hostlen + 6)){
+  if(buffSize < (12 + strlen(host) + 6)){
     return -1;
   }
 
@@ -249,9 +248,9 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
   // Z: 3 bits, debe ser 0
   // RCODE: 4 bits, response code - indica el status del response
   buffer_write(b,(uint8_t)0x00);
-  // QDCOUNT: 16 bits, cantidad de questions, en este caso 1
+  // QDCOUNT: 16 bits, cantidad de questions, 2 para AF_UNSPEC, 1 para otros
   buffer_write(b,(uint8_t)0x00);
-  buffer_write(b,(uint8_t)0x01);
+  buffer_write(b,questions);
   // ANCOUNT: 16 bits, cantidad de answers, en este caso 0
   buffer_write(b,(uint8_t)0x00);
   buffer_write(b,(uint8_t)0x00);
@@ -265,6 +264,26 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
   buffer_write(b,(uint8_t)0x00);
 
   //**  question section
+  if(dnsType==AF_INET6 || dnsType==AF_UNSPEC){
+    if(feedQuestion(host, 0x00, 0x1c, b)){
+      return -1;
+    }
+  }
+
+  if(dnsType==AF_INET || dnsType==AF_UNSPEC){
+    if(feedQuestion(host, 0x00, 0x01, b)){
+      return -1;
+    }
+  }
+
+  return (ssize_t) buffer_readable(b);
+}
+
+int
+feedQuestion(const char* host, uint8_t qtype1, uint8_t qtype2, buffer *b){
+  size_t hostlen = strlen(host);
+  const char *hostPointer = host;
+
   // QNAME
   // "secuencia de labels"
   // "primero el octet length y despues dichos octetos"
@@ -310,19 +329,14 @@ dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize){
   buffer_write(b,(uint8_t)0x00);
 
   // QTYPE
-  buffer_write(b,(uint8_t)0x00);
-  if(dnsType==AF_INET6){
-    buffer_write(b,(uint8_t)0x1c);
-  }else{
-    // si me llega AF_UNSPEC, lo mando a ipv4
-    buffer_write(b,(uint8_t)0x01);
-  }
+  buffer_write(b,qtype1);
+  buffer_write(b,qtype2);
 
   // QCLASS - Internet es 1
   buffer_write(b,(uint8_t)0x00);
   buffer_write(b,(uint8_t)0x01);
 
-  return (ssize_t) buffer_readable(b);
+  return 0;
 }
 
 ssize_t
