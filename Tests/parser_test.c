@@ -21,6 +21,15 @@
                           assert(c == res->data[0]);\
                         }
 
+// para que no salten error los tests
+unsigned long total_connections;
+unsigned int active_connections;
+unsigned long transferred_bytes;
+unsigned int max_clients;
+bool disectors_enabled;
+unsigned int buffer_size;
+struct doh* doh;
+
 // test functions
 void test_num_ok(void);
 void test_num_inv(void);

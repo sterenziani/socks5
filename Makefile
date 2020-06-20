@@ -9,14 +9,21 @@ DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
 DEPS= $(wildcard $(DOH_DIR)/*.h) $(wildcard $(DIR)/*.h)
-OBJ=$(DEPS:.h=.o)
+OBJECTS=$(DEPS:.h=.o)
+EXECUTABLE=main
 
 # Variables para doh Server
-## Al modificar el puerto, recordar tambien modificar dicho valor en Proxy/doh.c
 DOCKER=sudo docker
 DOH_PORT=8053
 DOH_IMAGE=doh-nginx
 DOH_CONTAINER=doh-server
+
+.PHONY: all
+all: $(EXECUTABLE)
+
+$(EXECUTABLE): $(OBJECTS)
+	$(CC) -c -o $@.o $(CFLAGS) $(DIR)/$@.c
+	$(CC) -o $@ $^ $@.o $(CFLAGS)
 
 .PHONY: doh-build
 doh-build:
@@ -36,10 +43,9 @@ doh-start: doh-stop
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 # Tests
-$(TEST_DIR)/%_test: $(OBJ)
+$(TEST_DIR)/%_test: $(OBJECTS)
 	$(CC) -c -o $@.o $(CFLAGS) $@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
-	rm -rf $@.o
 
 .PHONY: tests
 tests: $(subst .c,,$(TEST_C))
@@ -47,4 +53,4 @@ tests: $(subst .c,,$(TEST_C))
 
 .PHONY: clean
 clean:
-	rm -rf $(DIR)/*.o $(DIR)/*.out $(DIR)/*.dSYM *.o *.bin *.out $(TEST_DIR)/*_test
+	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test

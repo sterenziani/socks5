@@ -24,6 +24,15 @@
 #define BUFFER_MAX 1024
 #define INT_STRING_MAX 11
 
+// para que no salten error los tests
+unsigned long total_connections;
+unsigned int active_connections;
+unsigned long transferred_bytes;
+unsigned int max_clients;
+bool disectors_enabled;
+unsigned int buffer_size;
+struct doh* doh;
+
 // test functions
 void test_ipv4(void);
 void test_ipv6(void);
