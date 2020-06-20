@@ -8,7 +8,7 @@ DIR=Proxy
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
-DEPS= $(wildcard $(DOH_DIR)/*.h) $(wildcard $(DIR)/*.h)
+DEPS=  $(wildcard $(DIR)/*.h) $(wildcard $(DOH_DIR)/*.h)
 OBJECTS=$(DEPS:.h=.o)
 EXECUTABLE=main
 
