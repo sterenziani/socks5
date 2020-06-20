@@ -229,7 +229,7 @@ finally:
 /** realmente destruye */
 static void socks5_destroy_(struct socks5* s) {
     if(s->origin_resolution != NULL) {
-        freeaddrinfo(s->origin_resolution);
+        freedohinfo(s->origin_resolution);
         s->origin_resolution = NULL;
     }
     free(s);
@@ -251,7 +251,7 @@ static void socks5_destroy(struct socks5* s) {
             s->next = pool;
             pool = s;
             pool_size++;
-            freeaddrinfo(s->origin_resolution);
+            freedohinfo(s->origin_resolution);
         }
         else
             socks5_destroy_(s);
@@ -866,7 +866,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
 
   finally:
     fprintf(stdout, "Error. Couldn't connect %d to their requested origin server\n", sock->client_fd);
-    freeaddrinfo(sock->origin_resolution);
+    freedohinfo(sock->origin_resolution);
     sock->origin_resolution = 0;
     return ERROR;
 }
@@ -880,12 +880,12 @@ static unsigned request_resolve_done(struct selector_key *key) {
       p = sock->origin_resolution;
       sock->origin_resolution = sock->origin_resolution->ai_next;
       p->ai_next = NULL;
-      freeaddrinfo(p);
+      freedohinfo(p);
     }
     if(sock->origin_resolution == NULL)
     {
       fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
-      freeaddrinfo(sock->origin_resolution);
+      freedohinfo(sock->origin_resolution);
       sock->origin_resolution = 0;
       d->parser.error = request_connection_fail;
     }
