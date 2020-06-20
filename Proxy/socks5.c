@@ -540,7 +540,7 @@ static unsigned request_write(struct selector_key *key) {
     if(d->parser.error != request_success) {
       uint8_t ip[4] = {0};
       uint8_t port[2] = {0};
-      if(request_marshall(d->wb, ipv4, d->parser.error, ip, port, 4) < 0){
+      if(request_marshall(d->wb, d->parser.error) < 0){
         abort();
       }
       uint8_t *ptr = buffer_read_ptr(d->wb, &count);
@@ -561,7 +561,7 @@ static unsigned request_write(struct selector_key *key) {
       fam = ipv4;
       len = 4;
     }
-    if(request_marshall(d->wb, fam, request_success, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data+2, (uint8_t*)((const struct sockaddr *) &sock->origin_addr_storage)->sa_data, len) < 10)
+    if(request_marshall(d->wb, request_success) < 10)
     {
       abort();
     }
@@ -618,11 +618,6 @@ static void * request_resolve(void *data){
     while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
     {
       sock->origin_resolution = sock->origin_resolution->ai_next;
-    }
-    if(sock->origin_resolution == NULL)
-    {
-      fprintf(stdout, "Es null\n");
-      return 0;
     }
 
     //getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
@@ -1241,7 +1236,6 @@ static void socksv5_close(struct selector_key *key) {
 }
 
 static void socksv5_done(struct selector_key* key) {
-    //fprintf(stdout, "Closing connection between file descriptors %d-%d\n", ATTACHMENT(key)->client_fd, ATTACHMENT(key)->origin_fd);
     const int fds[] = {
         ATTACHMENT(key)->client_fd,
         ATTACHMENT(key)->origin_fd,
@@ -1252,7 +1246,6 @@ static void socksv5_done(struct selector_key* key) {
         int a = selector_unregister_fd(key->s, fds[i]);
         if(SELECTOR_SUCCESS != a)
         {
-          fprintf(stderr, "Couldn't unsuscribe from fd %d! Errno is %d\n", fds[i], a);
           abort();
         }
         close(fds[i]);

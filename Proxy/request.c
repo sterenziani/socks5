@@ -224,8 +224,7 @@ request_consume(buffer *b, struct request_parser *p, bool *errored) {
 }
 
 extern int
-request_marshall(buffer *b, const uint8_t atyp, const uint8_t reply,
-    const uint8_t address[], const uint8_t port[], const uint8_t len) {
+request_marshall(buffer *b, const uint8_t reply) {
     size_t n;
     size_t i = 0;
     uint8_t *buff = buffer_write_ptr(b, &n);
@@ -235,12 +234,12 @@ request_marshall(buffer *b, const uint8_t atyp, const uint8_t reply,
     buff[0] = 0x05;
     buff[1] = reply;
     buff[2] = 0x00;
-    buff[3] = atyp;
-    for(;i < len; i++) {
-    	buff[4 + i] =  address[i];
+    buff[3] = 0x01;
+    for(;i < 4; i++) {
+    	buff[4 + i] =  0;
     }
-    buff[4 + i] = port[0];
-    buff[5 + i] = port[1];
-    buffer_write_adv(b, len+6);
+    buff[4 + i] = 0;
+    buff[5 + i] = 0;
+    buffer_write_adv(b, 10);
     return n;
 }

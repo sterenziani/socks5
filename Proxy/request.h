@@ -97,5 +97,4 @@ void request_parser_close(struct request_parser *p);
  * espacio suficiente.
  */
 int
-request_marshall(buffer *b, const uint8_t atyp, const uint8_t reply,
-    const uint8_t address[], const uint8_t port[], const uint8_t len);
+request_marshall(buffer *b, const uint8_t reply);
