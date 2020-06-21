@@ -262,8 +262,21 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
         switch (p->status_dns) {
           case DNS_HEADER:
             p->status_dns = DNS_QUESTION_NAME;
+            // primera vez en el question name
+            if((c&0xc0) == 0xc0){
+              // tengo el puntero
+              p->prev_dnsIndex = p->dnsIndex+1;
+            }else if((c&0xc0) == 0x00){
+              // tengo que leer, la posición del prev indica si leer o no
+              p->prev_dnsIndex = 0;
+            }else{
+              //error
+              perror("DOH Request; dns packet has invalid format");
+              errno = EFAULT;
+              p->stage=STAGE_ERROR;
+            }
           case DNS_QUESTION_NAME:
-            if(c == 0x00){
+            if(p->prev_dnsIndex==p->dnsIndex || c == 0x00){
               p->status_dns = DNS_QUESTION_TYPE_AND_CLASS;
               p->prev_dnsIndex = p->dnsIndex;
             }
@@ -271,7 +284,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
           case DNS_QUESTION_TYPE_AND_CLASS:
             if(p->dnsIndex-p->prev_dnsIndex >= 4){
               if(--p->dnsQuestions){
-                p->status_dns = DNS_QUESTION_NAME;
+                p->status_dns = DNS_HEADER;
               }else if(p->dnsAnswers>0){
                 p->status_dns = DNS_ANSWER_NAME;
                 p->prev_dnsIndex = p->dnsIndex+1;
@@ -300,10 +313,10 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
               // primera vez, tengo que revisar si soy con memoria o si tengo que leer
               if((c&0xc0) == 0xc0){
                 // tengo el puntero
-                p->prev_dnsIndex = 0;
+                p->prev_dnsIndex = p->dnsIndex;
               }else if((c&0xc0) == 0x00){
                 // tengo que leer, la posición del prev indica si leer o no
-                p->prev_dnsIndex = p->dnsIndex;
+                p->prev_dnsIndex = 0;
               }else{
                 //error
                 perror("DOH Request; dns packet has invalid format");
@@ -312,9 +325,9 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
               }
             }else{
               // segunda vez entrando.
-              //  CASO puntero: el prev_dnsIndex == 0
+              //  CASO puntero: el prev_dnsIndex == dnsIndex-1
               //  CASO nombre: queda el 0x00 como ultimo octeto
-              if(p->prev_dnsIndex==0 || c == 0x00){
+              if(p->prev_dnsIndex==p->dnsIndex-1 || c == 0x00){
                 p->status_dns = DNS_ANSWER_TYPE_AND_CLASS;
                 p->prev_dnsIndex = p->dnsIndex+1;
               }

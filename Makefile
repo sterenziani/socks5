@@ -9,12 +9,12 @@ MAN_DIR=Manager
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
-DEPS=  $(wildcard $(DIR)/*.h) $(wildcard $(DOH_DIR)/*.h)
+DEPS=$(wildcard $(DIR)/*.h) $(wildcard $(DOH_DIR)/*.h)
 OBJECTS=$(DEPS:.h=.o)
+TEST_FILTER_OUT=$(DIR)/socks5.o $(DIR)/auth.o
 EXECUTABLE=main
 
 # Variables para doh Server
-DOCKER=sudo docker
 DOH_PORT=8053
 DOH_IMAGE=doh-nginx
 DOH_CONTAINER=doh-server
@@ -45,7 +45,7 @@ doh-start: doh-stop
 	$(CC) -c -o $@ $< $(CFLAGS)
 
 # Tests
-$(TEST_DIR)/%_test: $(OBJECTS)
+$(TEST_DIR)/%_test: $(filter-out $(TEST_FILTER_OUT),$(OBJECTS))
 	$(CC) -c -o $@.o $(CFLAGS) $@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
 

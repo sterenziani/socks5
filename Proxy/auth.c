@@ -122,14 +122,13 @@ int user_pass_valid(const char* u, int ulen, const char* p, int plen)
   char* user = malloc(ulen+1);
   char* pass = malloc(plen+1);
   memset(user, 0, ulen+1);
-  memset(user, 0, plen+1);
+  memset(pass, 0, plen+1);
   memcpy(user, u, ulen);
   memcpy(pass, p, plen);
   for(int i=0; i < MAX_USERS; i++)
   {
     if(registered_users[i][0] != NULL && registered_users[i][1] != NULL)
     {
-      fprintf(stdout, "Comparando %s:%s con %s:%s\n", registered_users[i][0], registered_users[i][1], user, pass);
       if(strcmp(registered_users[i][0], user) == 0 && strcmp(registered_users[i][1], pass) == 0)
       {
         free(user);

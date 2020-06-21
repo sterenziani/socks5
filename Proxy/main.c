@@ -102,6 +102,7 @@ int create_ipv6_socket(struct socks5args* args)
       return -1;
   }
   setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+  setsockopt(server, SOL_IPV6, IPV6_V6ONLY, &(int){ 1 }, sizeof(int));
   fprintf(stdout, "Listening on IPv6 TCP port %d\n", args->socks_port);
   if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
       return -2;
@@ -156,7 +157,7 @@ int main(const int argc, char **argv) {
         err_msg = "unable to listen";
         goto finally;
       }
-/*
+
       server2 = create_ipv4_socket(args);
       if(server2 == -1)
       {
@@ -173,7 +174,7 @@ int main(const int argc, char **argv) {
         err_msg = "unable to listen";
         goto finally;
       }
-*/
+
     }
     else
     {
@@ -227,6 +228,12 @@ int main(const int argc, char **argv) {
         err_msg = "getting server socket flags";
         goto finally;
     }
+    if(server2 > 0 && selector_fd_set_nio(server2) == -1)
+    {
+      err_msg = "getting server socket flags";
+      goto finally;
+    }
+
     const struct selector_init conf = {
         .signal = SIGALRM,
         .select_timeout = {
@@ -250,6 +257,13 @@ int main(const int argc, char **argv) {
         .handle_close      = NULL, // nada que liberar
     };
     ss = selector_register(selector, server, &socksv5, OP_READ, NULL);
+    if(ss != SELECTOR_SUCCESS) {
+        err_msg = "registering fd";
+        goto finally;
+    }
+
+    if(server2 > 0)
+      ss = selector_register(selector, server2, &socksv5, OP_READ, NULL);
     if(ss != SELECTOR_SUCCESS) {
         err_msg = "registering fd";
         goto finally;
@@ -287,6 +301,9 @@ finally:
 
     if(server >= 0) {
         close(server);
+    }
+    if(server2 >= 0) {
+        close(server2);
     }
     return ret;
 }
