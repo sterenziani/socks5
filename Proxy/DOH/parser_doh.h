@@ -1,6 +1,7 @@
 #ifndef PARSER_DOH_H
 #define PARSER_DOH_H
 
+#include <errno.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -17,6 +18,7 @@
 #include "parser_http.h"
 
 // strings relevantes
+#define ERROR_BUFFER 128
 
 #define PARSER_STRING_TE "Transfer-Encoding: chunked"
 #define PARSER_STRING_CT "Content-Type: application/dns-message"

@@ -5,6 +5,7 @@
 #include <string.h>
 #include <sys/types.h>
 
+#include "../Proxy/args.h"
 #include "../Proxy/buffer.h"
 #include "../Proxy/DOH/parser.h"
 #include "../Proxy/DOH/parser_num.h"
@@ -29,6 +30,7 @@ unsigned int max_clients;
 bool disectors_enabled;
 unsigned int buffer_size;
 struct doh* doh;
+char* registered_users[MAX_USERS][2];
 
 // test functions
 void test_num_ok(void);
