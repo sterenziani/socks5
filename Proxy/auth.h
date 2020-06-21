@@ -4,6 +4,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include "buffer.h"
+#include "args.h"
 
 enum auth_state {
     auth_version,
@@ -28,7 +29,7 @@ struct auth_parser {
     char password[256];
 };
 
-
+extern char* registered_users[MAX_USERS][2];
 void auth_parser_init (struct auth_parser *p);
 enum auth_state auth_parser_feed (struct auth_parser *p, uint8_t b);
 enum auth_state auth_consume(buffer *b, struct auth_parser *p, bool *errored);

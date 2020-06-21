@@ -41,6 +41,13 @@ static struct doh defaultDoh = {
   .query  = "?dns=",
 };
 
+// doh_timeout time
+static struct timespec doh_timeout = {
+  .tv_sec = TIMEOUT_SEC,
+  .tv_nsec = 0,
+};
+
+
 // funciones principales
 
 // resuelve el nombre
@@ -57,6 +64,10 @@ getDohServer(const struct doh* dohAddr, struct sockaddr_storage* server);
 ssize_t
 dnsEncode(const char* host, int dnsType, buffer *b, size_t buffSize);
 
+//  recibe un host, el tipo de dns y un buffer, ingresa el Question Section a dicho buffer
+int
+feedQuestion(const char* host, uint8_t qtype1, uint8_t qtype2, buffer *b);
+
 // recibe la dirección de un doh server y un dns message y forma el request http
 ssize_t
 httpEncode(const struct doh* dohAddr, buffer *req, buffer *dnsMessage, char *contentLength);
@@ -68,5 +79,8 @@ sendHttpMessage(int fd, buffer *request);
 // manda todo lo readable del buffer al parser doh
 int
 feedParser(struct parser_doh *p, buffer *b);
+
+void
+freedohinfo(struct addrinfo *res);
 
 #endif // DOH_H_
