@@ -64,35 +64,15 @@ request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
                 p->remaining = 0x00;
                 p->users[p->user_number][p->pointer] = b;
                 p->pointer = 0x00;
-                p->state = request_pass;
-            }
-            else {
-                p->remaining --;
-                p->users[p->user_number][p->pointer] = b;
-                p->pointer ++;
-            }
-            break;
-
-        case request_pass:
-            if(p->remaining == 0) {
-                p->remaining = b;
-            }
-            else if(p->remaining == 1) {
-                p->remaining = 0x00;
-                p->users[p->user_number][p->pointer] = b;
-                p->pointer = 0x00;
                 p-> user_number ++;
                 p->total_users --;
                 if(p->total_users == 0x00) {
                     p->state = request_done;
                 }
-                else {
-                    p->state = request_user;
-                }
             }
             else {
                 p->remaining --;
-                p->passwords[p->user_number][p->pointer] = b;
+                p->users[p->user_number][p->pointer] = b;
                 p->pointer ++;
             }
             break;

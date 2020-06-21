@@ -5,6 +5,7 @@
 # Variables para compilador C
 CFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
+MAN_DIR=Manager
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
@@ -21,9 +22,10 @@ DOH_CONTAINER=doh-server
 .PHONY: all
 all: $(EXECUTABLE)
 
-$(EXECUTABLE): $(OBJECTS)
+$(EXECUTABLE): $(OBJECTS) 
 	$(CC) -c -o $@.o $(CFLAGS) $(DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
+	$(CC) $(CFLAGS) Proxy/selector.c Proxy/buffer.c Proxy/stm.c Manager/*.c Proxy/auth.h
 
 .PHONY: doh-build
 doh-build:
@@ -53,4 +55,7 @@ tests: $(subst .c,,$(TEST_C))
 
 .PHONY: clean
 clean:
-	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test
+	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test manager manager.o $(MAN_DIR)/*.o
+
+
+

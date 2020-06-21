@@ -1,7 +1,7 @@
 #include <stdint.h>
 #include <stdbool.h>
 
-#include "buffer.h"
+#include "../Proxy/buffer.h"
 
 enum hello_manager_state {
     hello_version,

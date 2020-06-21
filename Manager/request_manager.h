@@ -1,7 +1,6 @@
 #include <stdint.h>
 #include <stdbool.h>
-
-#include "buffer.h"
+#include "../Proxy/buffer.h"
 
 #define MAX_USERS 10
 
@@ -11,7 +10,6 @@ enum request_manager_state {
     request_status,
     request_user_amount,
     request_user,
-    request_pass,
     request_total_con,
     request_active_con,
     request_bytes,
@@ -25,7 +23,6 @@ struct request_manager_parser {
     enum request_manager_state state;
 
    	uint8_t users[MAX_USERS][255];
-   	uint8_t passwords[MAX_USERS][255];
 
    	uint8_t remaining;
    	uint8_t total_users;
