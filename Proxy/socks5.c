@@ -700,13 +700,27 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
             if(disectors_enabled)
               initialize_communication_parser(sock);
             char* timestamp = time_stamp();
-            if(strlen(sock->username) > 0)
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
+
+            char* clientIP;
+            if(sock->client_addr.ss_family == AF_INET6)
+            {
+              clientIP = malloc(INET6_ADDRSTRLEN);
+              inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->client_addr))->sin6_addr, clientIP, INET6_ADDRSTRLEN);
+            }
             else
             {
-              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
+              clientIP = malloc(INET_ADDRSTRLEN);
+              char* aux = inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr);
+              memcpy(clientIP, aux, INET_ADDRSTRLEN);
+            }
+            if(strlen(sock->username) > 0)
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
+            else
+            {
+              fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin_port), d->parser.error);
             }
             free(timestamp);
+            free(clientIP);
             selector_register(key->s, sock->origin_fd, &socks5_handler, OP_NOOP, sock);
         }
         else if(d->parser.address_type == domain)
@@ -749,11 +763,24 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
           if(disectors_enabled)
             initialize_communication_parser(sock);
           char* timestamp = time_stamp();
-          if(strlen(sock->username) > 0)
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
+          char* clientIP;
+          if(sock->client_addr.ss_family == AF_INET6)
+          {
+            clientIP = malloc(INET6_ADDRSTRLEN);
+            inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->client_addr))->sin6_addr, clientIP, INET6_ADDRSTRLEN);
+          }
           else
-            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
+          {
+            clientIP = malloc(INET_ADDRSTRLEN);
+            char* aux = inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr);
+            memcpy(clientIP, aux, INET_ADDRSTRLEN);
+          }
+          if(strlen(sock->username) > 0)
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, sock->username, clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
+          else
+            fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, "ANON", clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), ip, ntohs(address.sin6_port), d->parser.error);
           free(timestamp);
+          free(clientIP);
           selector_register(key->s, sock->origin_fd, &socks5_handler, OP_NOOP, sock);
         }
         break;
@@ -863,8 +890,21 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
   }
   else{
     char* timestamp = time_stamp();
-    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, sock->origin_port, d->parser.error);
+    char* clientIP;
+    if(sock->client_addr.ss_family == AF_INET6)
+    {
+      clientIP = malloc(INET6_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->client_addr))->sin6_addr, clientIP, INET6_ADDRSTRLEN);
+    }
+    else
+    {
+      clientIP = malloc(INET_ADDRSTRLEN);
+      char* aux = inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr);
+      memcpy(clientIP, aux, INET_ADDRSTRLEN);
+    }
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s\t%d\t%d\n", timestamp, user, clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, sock->origin_port, d->parser.error);
     free(timestamp);
+    free(clientIP);
     selector_set_interest(key->s, sock->client_fd, OP_WRITE);
     return REQUEST_WRITE;
   }
@@ -874,8 +914,21 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     s = malloc(INET_ADDRSTRLEN);
     inet_ntop(AF_INET, &((struct sockaddr_in *)((const struct sockaddr *) &sock->origin_addr_storage))->sin_addr, s, INET_ADDRSTRLEN);
     char* timestamp = time_stamp();
-    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
+    char* clientIP;
+    if(sock->client_addr.ss_family == AF_INET6)
+    {
+      clientIP = malloc(INET6_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->client_addr))->sin6_addr, clientIP, INET6_ADDRSTRLEN);
+    }
+    else
+    {
+      clientIP = malloc(INET_ADDRSTRLEN);
+      char* aux = inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr);
+      memcpy(clientIP, aux, INET_ADDRSTRLEN);
+    }
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
     free(s);
+    free(clientIP);
     free(timestamp);
   }
   else if(sock->origin_resolution->ai_family == AF_INET6)
@@ -883,9 +936,22 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     s = malloc(INET6_ADDRSTRLEN);
     inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->origin_addr_storage))->sin6_addr, s, INET6_ADDRSTRLEN);
     char* timestamp = time_stamp();
-    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr), ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
+    char* clientIP;
+    if(sock->client_addr.ss_family == AF_INET6)
+    {
+      clientIP = malloc(INET6_ADDRSTRLEN);
+      inet_ntop(AF_INET6, &((struct sockaddr_in6 *)((const struct sockaddr *) &sock->client_addr))->sin6_addr, clientIP, INET6_ADDRSTRLEN);
+    }
+    else
+    {
+      clientIP = malloc(INET_ADDRSTRLEN);
+      char* aux = inet_ntoa(((struct sockaddr_in *)(&sock->client_addr))->sin_addr);
+      memcpy(clientIP, aux, INET_ADDRSTRLEN);
+    }
+    fprintf(stdout, "%s\t%s\tA\t%s\t%d\t%s (%s)\t%d\t%d\n", timestamp, user, clientIP, ntohs(((struct sockaddr_in *)(&sock->client_addr))->sin_port), sock->origin_addr, s, sock->origin_port, d->parser.error);
     free(s);
     free(timestamp);
+    free(clientIP);
   }
   return REQUEST_WRITE;
 
