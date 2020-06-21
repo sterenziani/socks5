@@ -62,6 +62,56 @@ void register_users(struct users* users, char* registered_users[MAX_USERS][2])
   }
 }
 
+int create_ipv4_socket(struct socks5args* args)
+{
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = inet_addr(args->socks_addr);
+  addr.sin_port = htons(args->socks_port);
+
+  int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
+  if(server < 0) {
+      return -1;
+  }
+  fprintf(stdout, "Listening on IPv4 TCP port %d\n", args->socks_port);
+  setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+  if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+      return -2;
+  }
+  if (listen(server, 20) < 0) {
+      return -3;
+  }
+  return server;
+}
+
+int create_ipv6_socket(struct socks5args* args)
+{
+  struct sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
+  addr.sin6_family = AF_INET6;
+
+  if(strcmp(args->socks_addr, "0.0.0.0") != 0)
+    inet_pton(AF_INET6, args->socks_addr, &addr.sin6_addr.s6_addr);
+  else
+    inet_pton(AF_INET6, "::", &addr.sin6_addr.s6_addr);
+  addr.sin6_port = htons(args->socks_port);
+
+  int server = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
+  if(server < 0) {
+      return -1;
+  }
+  setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+  fprintf(stdout, "Listening on IPv6 TCP port %d\n", args->socks_port);
+  if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+      return -2;
+  }
+  if (listen(server, 20) < 0) {
+      return -3;
+  }
+  return server;
+}
+
 int main(const int argc, char **argv) {
     total_connections = 0;
     active_connections = 0;
@@ -85,31 +135,86 @@ int main(const int argc, char **argv) {
     selector_status ss = SELECTOR_SUCCESS;
     fd_selector selector = NULL;
 
-    struct sockaddr_in addr;
-    memset(&addr, 0, sizeof(addr));
-    addr.sin_family = AF_INET;
-    addr.sin_addr.s_addr = inet_addr(args->socks_addr);
-    addr.sin_port = htons(args->socks_port);
+    int server;
+    int server2 = -4;
 
-    // CREAMOS EL SOCKET PASIVO
-    const int server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
-    if(server < 0) {
+    if(strcmp(args->socks_addr, "0.0.0.0") == 0)
+    {
+      server = create_ipv6_socket(args);
+      if(server == -1)
+      {
         err_msg = "unable to create socket";
         goto finally;
-    }
-    fprintf(stdout, "Listening on TCP port %d\n", args->socks_port);
-
-    // man 7 ip. no importa reportar nada si falla.
-    setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-
-    if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+      }
+      else if(server == -2)
+      {
         err_msg = "unable to bind socket";
         goto finally;
-    }
-
-    if (listen(server, 20) < 0) {
+      }
+      else if(server == -3)
+      {
         err_msg = "unable to listen";
         goto finally;
+      }
+/*
+      server2 = create_ipv4_socket(args);
+      if(server2 == -1)
+      {
+        err_msg = "unable to create socket";
+        goto finally;
+      }
+      else if(server2 == -2)
+      {
+        err_msg = "unable to bind socket";
+        goto finally;
+      }
+      else if(server2 == -3)
+      {
+        err_msg = "unable to listen";
+        goto finally;
+      }
+*/
+    }
+    else
+    {
+      if(strchr(args->socks_addr, ':') != NULL)
+      {
+        server = create_ipv6_socket(args);
+        if(server == -1)
+        {
+          err_msg = "unable to create socket";
+          goto finally;
+        }
+        else if(server == -2)
+        {
+          err_msg = "unable to bind socket";
+          goto finally;
+        }
+        else if(server == -3)
+        {
+          err_msg = "unable to listen";
+          goto finally;
+        }
+      }
+      else
+      {
+        server = create_ipv4_socket(args);
+        if(server == -1)
+        {
+          err_msg = "unable to create socket";
+          goto finally;
+        }
+        else if(server == -2)
+        {
+          err_msg = "unable to bind socket";
+          goto finally;
+        }
+        else if(server == -3)
+        {
+          err_msg = "unable to listen";
+          goto finally;
+        }
+      }
     }
 
     // registrar sigterm es útil para terminar el programa normalmente.
