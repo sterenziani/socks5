@@ -604,9 +604,34 @@ static void * request_resolve(void *data){
     char buff[7];
     snprintf(buff, sizeof(buff), "%d", sock->origin_port);
 
+    struct addrinfo* p;
+    // Plan A = Solve for any type of IP
     solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
-
-    //getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
+    {
+      p = sock->origin_resolution;
+      sock->origin_resolution = sock->origin_resolution->ai_next;
+      p->ai_next = NULL;
+      freedohinfo(p);
+    }
+    // Plan B = Solve for IPv4 only
+    if(sock->origin_resolution == NULL)
+    {
+      hints.ai_family = AF_INET;
+      solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
+    }
+    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET)
+    {
+      p = sock->origin_resolution;
+      sock->origin_resolution = sock->origin_resolution->ai_next;
+      p->ai_next = NULL;
+      freedohinfo(p);
+    }
+    // Plan C = Use getaddrinfo
+    if(sock->origin_resolution == NULL)
+    {
+      getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+    }
     selector_notify_block(key->s, key->fd);
     free(data);
     return 0;
@@ -874,14 +899,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
 static unsigned request_resolve_done(struct selector_key *key) {
     struct socks5 *sock = ATTACHMENT(key);
     struct request_st *d = &ATTACHMENT(key)->client.request;
-    struct addrinfo* p;
-    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
-    {
-      p = sock->origin_resolution;
-      sock->origin_resolution = sock->origin_resolution->ai_next;
-      p->ai_next = NULL;
-      freedohinfo(p);
-    }
     if(sock->origin_resolution == NULL)
     {
       fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
