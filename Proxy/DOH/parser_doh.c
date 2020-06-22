@@ -221,7 +221,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
     }
   }else if(p->stage == STAGE_DNS){
 
-    // trabajando sobre stage dns, chunked no existe (por ahora)
+    // trabajando sobre stage dns
     if(p->contentLength || p->is_connectionClose){
       if(p->dnsIndex<12){
         p->status_dns = DNS_HEADER;
@@ -426,6 +426,11 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
       // para avanzar el index
       p->dnsIndex++;
       p->contentLength--;
+
+      if(p->contentLength==0 && p->is_chunked==0){
+        p->status_http = DOH_FINISHED;
+        p->stage = STAGE_END;
+      }
     }else if(p->is_chunked){
       // hacer el parseo de chunked
       const struct parser_event *r;
@@ -477,11 +482,7 @@ parser_doh_getStatusCode(struct parser_doh *p){
 
 struct addrinfo *
 parser_doh_getAddrInfo(struct parser_doh *p, int *err){
-  if(p->stage == STAGE_END){
-    *err = 0;
-  }else{
-    *err = -1;
-  }
+  *err = (p->stage != STAGE_END);
   return p->addrInfo_root;
 }
 

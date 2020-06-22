@@ -117,14 +117,17 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   struct parser_doh *myDohParser = parser_doh_init();
 
   int n=0;
+  int end=0;
   do{
 
     //hacer el parseo
-    if(feedParser(myDohParser,res)!=0){
+    if((end = feedParser(myDohParser,res))<0){
       perror("Parsing error: ");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);
       return -1;
+    }else if(end){
+      break;
     }
 
     if(pselect(sockfd+1,&socketSet,NULL,NULL,&doh_timeout,&blockset)==-1){
@@ -164,10 +167,10 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
     FD_ZERO(&socketSet);
     FD_SET(sockfd,&socketSet);
-  }while(n!=0);
+  }while(end==0 && n!=0);
 
   //hacer el parseo
-  if(feedParser(myDohParser,res)!=0){
+  if(end!=0 && (end = feedParser(myDohParser,res))<0){
     perror("Parsing error: ");
     parser_doh_destroy(myDohParser);
     shutdown(sockfd, SHUT_RDWR);
@@ -354,7 +357,7 @@ httpEncode(const struct doh* dohAddr, buffer *req, buffer *dnsMessage, char *con
   buffer_write_string(req,"\r\n");  // modifiy later to sprintf
   buffer_write_string(req,"Content-Type: application/dns-message\r\n");
   buffer_write_string(req,"Accept: application/dns-message\r\n");
-  buffer_write_string(req,"Connection: close\r\n");
+  buffer_write_string(req,"Connection: keep-alive\r\n");
   buffer_write_string(req,"Content-Length: ");
   buffer_write_string(req,contentLength);
   buffer_write_string(req,"\r\n\r\n");
@@ -401,6 +404,8 @@ feedParser(struct parser_doh *p, buffer *b){
   while(buffer_can_read(b)){
     if( parser_doh_feed(p, buffer_read(b)) == STAGE_ERROR ){
       return -1;
+    }else if( parser_doh_feed(p, buffer_read(b)) == STAGE_END ){
+      return 1;
     }
   }
   buffer_reset(b);
