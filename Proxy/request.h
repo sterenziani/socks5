@@ -22,7 +22,10 @@ enum request_state {
 enum request_error_code {
     request_success = 0x00,
     request_socks_fail = 0x01,
+    request_network_unreachable = 0x03,
+    request_host_unreachable = 0x04,
     request_connection_fail = 0x05,
+    request_ttl_expired = 0x06,
     request_unsupported_cmd = 0x07,
     request_unsupported_atyp = 0x08,
 };
