@@ -619,18 +619,27 @@ static void * request_resolve(void *data){
     {
       hints.ai_family = AF_INET;
       solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
-    }
-    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET)
-    {
-      p = sock->origin_resolution;
-      sock->origin_resolution = sock->origin_resolution->ai_next;
-      p->ai_next = NULL;
-      freedohinfo(p);
+      while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET)
+      {
+        p = sock->origin_resolution;
+        sock->origin_resolution = sock->origin_resolution->ai_next;
+        p->ai_next = NULL;
+        freedohinfo(p);
+      }
     }
     // Plan C = Use getaddrinfo
     if(sock->origin_resolution == NULL)
     {
+      printf("plan C: getaddrinfo");
       getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+
+      while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
+      {
+        p = sock->origin_resolution;
+        sock->origin_resolution = sock->origin_resolution->ai_next;
+        p->ai_next = NULL;
+        freeaddrinfo(p);
+      }
     }
     selector_notify_block(key->s, key->fd);
     free(data);
