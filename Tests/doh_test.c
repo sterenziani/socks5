@@ -135,7 +135,7 @@ void test_unspec(void){
   printf("doh_test/returns_unspec:\tsuccess!\n");
 
   aux = res_doh;
-  while(aux!=NULL && aux->ai_family!=AF_INET && aux->ai_family!=AF_INET6){
+  while(aux!=NULL && aux->ai_family!=AF_INET){
     aux = aux->ai_next;
   }
 

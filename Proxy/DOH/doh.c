@@ -177,8 +177,10 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     return -1;
   }
 
-  int err;
+  int err, ipv4_exists=0;
   *ret_addrInfo = parser_doh_getAddrInfo(myDohParser, &err);
+  struct addrinfo *aux = *ret_addrInfo;
+  struct addrinfo *last = aux;
 
   if(err==0){
 
@@ -188,9 +190,9 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       port_number = port_number*10+(port[i]-'0');
     }
 
-    struct addrinfo *aux = *ret_addrInfo;
     while(aux!=NULL){
       if(aux->ai_family==AF_INET){
+        ipv4_exists = 1;
         ((struct sockaddr_in*)aux->ai_addr)->sin_port = htons(port_number);
       }else if(aux->ai_family==AF_INET6){
         ((struct sockaddr_in6*)aux->ai_addr)->sin6_port = htons(port_number);
@@ -199,9 +201,139 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       aux->ai_socktype = SOCK_STREAM;
 
       aux = aux->ai_next;
+      last = aux;
     }
   }
   parser_doh_destroy(myDohParser);
+
+  // backup plan
+  if(hints->ai_family == AF_UNSPEC && !ipv4_exists){
+
+    struct addrinfo *ret2 = NULL;
+
+    // new dns message
+    buffer_reset(m);
+    contentLength = dnsEncode(host,AF_INET,m,BUFFER_MAX);
+    snprintf(contentLength_str, sizeof contentLength_str, "%zu", contentLength);
+
+    // encoding http
+    buffer_reset(req);
+    if(httpEncode(doh_curr, req, m, contentLength_str) < 0){
+      perror("Encoding http message failed\n");
+      shutdown(sockfd, SHUT_RDWR);
+      return -1;
+    }
+
+    // connect to HTTP
+    bytes_sent = sendHttpMessage(sockfd,req);
+    if(bytes_sent<0){
+      perror("send http message failed");
+      shutdown(sockfd, SHUT_RDWR);
+      return -1;
+    }
+
+    //reset resposne buffer
+    buffer_reset(res);
+
+    myDohParser = parser_doh_init();
+
+    int n=0;
+    int end=0;
+    do{
+
+      //hacer el parseo
+      if((end = feedParser(myDohParser,res))<0){
+        perror("Parsing error: ");
+        parser_doh_destroy(myDohParser);
+        shutdown(sockfd, SHUT_RDWR);
+        return -1;
+      }else if(end){
+        break;
+      }
+
+      if(pselect(sockfd+1,&socketSet,NULL,NULL,&doh_timeout,&blockset)==-1){
+        perror("Select error");
+        parser_doh_destroy(myDohParser);
+        shutdown(sockfd, SHUT_RDWR);
+        return -1;
+      }
+
+      if(FD_ISSET(sockfd, &socketSet)){
+
+        if(!buffer_can_write(res)){
+          perror("Can't write on response buffer");
+          parser_doh_destroy(myDohParser);
+          shutdown(sockfd, SHUT_RDWR);
+          return -1;
+        }
+        size_t max_write;
+        uint8_t *write_dir = buffer_write_ptr(res,&max_write);
+
+        n = read(sockfd, write_dir, max_write);		//Reads the buffer
+        if (n < 0){
+          perror("Error on reading");
+          parser_doh_destroy(myDohParser);
+          shutdown(sockfd, SHUT_RDWR);
+          return -1;
+        }
+        buffer_write_adv(res,n);
+
+      }else{
+        // timed out
+        perror("Connection timed out");
+        parser_doh_destroy(myDohParser);
+        shutdown(sockfd, SHUT_RDWR);
+        return -1;
+      }
+
+      FD_ZERO(&socketSet);
+      FD_SET(sockfd,&socketSet);
+    }while(end==0 && n!=0);
+
+    //hacer el parseo
+    if(end!=0 && (end = feedParser(myDohParser,res))<0){
+      perror("Parsing error: ");
+      parser_doh_destroy(myDohParser);
+      shutdown(sockfd, SHUT_RDWR);
+      return -1;
+    }
+
+    ret2 = parser_doh_getAddrInfo(myDohParser, &err);
+
+    if(err==0){
+
+      uint32_t port_number = 0;
+
+      for(int i=0; port[i]!=0; i++){
+        port_number = port_number*10+(port[i]-'0');
+      }
+
+      struct addrinfo *aux2 = ret2;
+      while(aux2!=NULL){
+        if(aux2->ai_family==AF_INET){
+          ((struct sockaddr_in*)aux2->ai_addr)->sin_port = htons(port_number);
+        }else if(aux2->ai_family==AF_INET6){
+          ((struct sockaddr_in6*)aux2->ai_addr)->sin6_port = htons(port_number);
+        }
+
+        aux2->ai_socktype = SOCK_STREAM;
+
+        aux2 = aux2->ai_next;
+      }
+
+      aux2 = *ret_addrInfo;
+      if(aux2==NULL){
+        *ret_addrInfo = ret2;
+      }else{
+        while(aux2->ai_next!=NULL){
+          aux2 = aux2->ai_next;
+        }
+        aux2->ai_next = ret2;
+      }
+    }
+  }
+
+
   shutdown(sockfd, SHUT_RDWR);
 	return err;
 }
