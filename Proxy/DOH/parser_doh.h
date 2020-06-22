@@ -78,10 +78,6 @@ parser_doh_getStatusCode(struct parser_doh *p);
 
 int
 parser_doh_isValidContentType(struct parser_doh *p);
-/*
-int
-parser_doh_getAddrInfo(struct parser_doh *p, struct addrinfo **res);
-*/
 
 struct addrinfo *
 parser_doh_getAddrInfo(struct parser_doh *p, int *err);
