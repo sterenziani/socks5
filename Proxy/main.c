@@ -21,8 +21,10 @@
 #include <sys/socket.h>
 #include <netinet/in.h>
 #include <netinet/tcp.h>
+#include <netinet/sctp.h>
 #include <arpa/inet.h>
 #include "socks5.h"
+#include "manager_server.h"
 #include "selector.h"
 #include "args.h"
 
@@ -112,6 +114,45 @@ int create_ipv6_socket(struct socks5args* args)
   }
   return server;
 }
+
+static int create_manager_socket(struct socks5args* args) {
+  
+  struct sockaddr_in addr;
+  memset(&addr, 0, sizeof(addr));
+
+  struct sctp_initmsg initmsg;
+
+  addr.sin_family = AF_INET;
+  addr.sin_addr.s_addr = inet_addr(args->mng_addr);
+  addr.sin_port = htons(args->mng_port);
+
+  int mng_fd = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
+
+  if(mng_fd < 0) {
+    return -1;
+  }
+
+  memset (&initmsg, 0, sizeof (initmsg));
+  initmsg.sinit_num_ostreams = 5;
+  initmsg.sinit_max_instreams = 5;
+  initmsg.sinit_max_attempts = 4;
+
+  if(setsockopt(mng_fd, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg))){
+    return -1;
+  }
+
+  if(bind(mng_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+    return -2;
+  }
+
+  if (listen(mng_fd, 5) < 0) {
+    return -3;
+  }
+
+  fprintf(stdout, "Escuchando a admin en puerto %d", args->mng_port);
+  return mng_fd;
+}
+
 
 int main(const int argc, char **argv) {
     total_connections = 0;
@@ -218,6 +259,8 @@ int main(const int argc, char **argv) {
       }
     }
 
+    int manager = create_manager_socket(args);
+
     // registrar sigterm es útil para terminar el programa normalmente.
     // esto ayuda mucho en herramientas como valgrind.
     signal(SIGTERM, sigterm_handler);
@@ -232,6 +275,10 @@ int main(const int argc, char **argv) {
     {
       err_msg = "getting server socket flags";
       goto finally;
+    }
+    if(selector_fd_set_nio(manager) == -1) {
+        err_msg = "getting server socket flags";
+        goto finally;
     }
 
     const struct selector_init conf = {
@@ -251,11 +298,19 @@ int main(const int argc, char **argv) {
         err_msg = "unable to create selector";
         goto finally;
     }
+
     const struct fd_handler socksv5 = {
         .handle_read       = socksv5_passive_accept,
         .handle_write      = NULL,
         .handle_close      = NULL, // nada que liberar
     };
+
+    const struct fd_handler manager_handler = {
+        .handle_read       = manager_server_start,
+        .handle_write      = NULL,
+        .handle_close      = NULL, 
+    };
+
     ss = selector_register(selector, server, &socksv5, OP_READ, NULL);
     if(ss != SELECTOR_SUCCESS) {
         err_msg = "registering fd";
@@ -264,6 +319,12 @@ int main(const int argc, char **argv) {
 
     if(server2 > 0)
       ss = selector_register(selector, server2, &socksv5, OP_READ, NULL);
+    if(ss != SELECTOR_SUCCESS) {
+        err_msg = "registering fd";
+        goto finally;
+    }
+
+    ss = selector_register(selector, manager, &manager_handler, OP_READ, NULL);
     if(ss != SELECTOR_SUCCESS) {
         err_msg = "registering fd";
         goto finally;
@@ -303,6 +364,9 @@ finally:
         close(server);
     }
     if(server2 >= 0) {
+        close(server2);
+    }
+    if(manager >= 0) {
         close(server2);
     }
     return ret;

@@ -55,7 +55,7 @@ tests: $(subst .c,,$(TEST_C))
 
 .PHONY: clean
 clean:
-	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test manager manager.o $(MAN_DIR)/*.o
+	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test manager manager.o $(MAN_DIR)/*.o a.out
 
 
 

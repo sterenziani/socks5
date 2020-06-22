@@ -68,8 +68,8 @@ void
 parse_manager_args(const int argc, char **argv, struct manager_args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
 
-    args->socks_addr = "0.0.0.0";
-    args->socks_port = 1080;
+    args->socks_addr = "127.0.0.1";
+    args->socks_port = 8080;
     args->command = 0xFF;
 
     int c;

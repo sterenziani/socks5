@@ -11,6 +11,7 @@
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
+#include <netinet/sctp.h>
 #include <netdb.h>
 #include "hello_manager.h"
 #include "request_manager.h"
@@ -94,6 +95,9 @@ static struct manager* new_manager(int manager_fd) {
   	manager->stm.max_state = ERROR;
   	manager->stm.states = manager_describe_states();
   	stm_init(&manager->stm);
+
+        fprintf(stdout, "MANAGER NEW CLIENTE\n");
+
   	
   	buffer_init(&manager->manager_read_buffer, N(manager->raw_buff_a), manager->raw_buff_a);
   	buffer_init(&manager->manager_write_buffer, N(manager->raw_buff_b), manager->raw_buff_b);
@@ -105,8 +109,6 @@ void manager_start (struct  selector_key *key) {
 
 	struct manager* state = NULL;
 
-    fprintf(stdout, "MANAGER START\n");
-
 	struct sockaddr_storage socks_addr;
     socklen_t socks_addr_len = sizeof(socks_addr);
 
@@ -114,21 +116,35 @@ void manager_start (struct  selector_key *key) {
     if(manager == -1) {
         goto fail;
     }
+        fprintf(stdout, "MANAGER START CLIENTE 2\n");
+
     if(selector_fd_set_nio(manager) == -1) {
         goto fail;
     }
+
+            fprintf(stdout, "MANAGER START CLIENTE 3\n");
 
     state = new_manager(manager);
 
     if(state == NULL) {
         goto fail;
     }
+
+            fprintf(stdout, "MANAGER START CLIENTE 4\n");
+
+
     memcpy(&state->socks_addr, &socks_addr, socks_addr_len);
     state->socks_addr_len = socks_addr_len;
+
+            fprintf(stdout, "MANAGER START CLIENTE 5\n");
+
 
     if(SELECTOR_SUCCESS != selector_register(key->s, manager, &manager_handler, OP_WRITE, state)) {
         goto fail;
     }
+
+        fprintf(stdout, "MANAGER START CLIENTE SALGO\n");
+
     return;
 	
 	fail:
@@ -143,13 +159,15 @@ void manager_start (struct  selector_key *key) {
 /////////////////////////////////////////////////////////
 
 static void hello_manager_write_init(const unsigned state, struct selector_key* key) {
+        fprintf(stdout, "EMPEZANDO write de lado cliente\n");
     struct hello_manager_st *d = &ATTACHMENT(key)->manager.hello;
     d->rb                              = &(ATTACHMENT(key)->manager_read_buffer);
     d->wb                              = &(ATTACHMENT(key)->manager_write_buffer);
+
 }
 
 static unsigned hello_manager_write(struct selector_key* key) {
-        fprintf(stdout, "MANAGER HELLO\n");
+     
 
 	struct hello_manager_st *d = &ATTACHMENT(key)->manager.hello;
 	unsigned ret = MNG_HELLO_READ;
@@ -480,7 +498,7 @@ int main(const int argc, char **argv) {
         addr.sin_family = AF_INET;
         addr.sin_addr.s_addr = inet_addr(args->socks_addr);
         addr.sin_port = htons(args->socks_port);
-        sock = socket(AF_INET, SOCK_STREAM, 0);
+        sock = socket(AF_INET, SOCK_STREAM, IPPROTO_SCTP);
         if(connect(sock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
     		fprintf(stderr, "No pudo conectarse al proxy\n");
 
@@ -492,7 +510,7 @@ int main(const int argc, char **argv) {
         addr.sin6_family = AF_INET6;
         inet_pton(AF_INET6, args->socks_addr, &addr.sin6_addr.s6_addr);
         addr.sin6_port = htons(args->socks_port);
-        sock = socket(AF_INET6, SOCK_STREAM, 0);
+        sock = socket(AF_INET6, SOCK_STREAM, IPPROTO_SCTP);
         if(connect(sock, (struct sockaddr*) &addr, sizeof(addr)) == -1) {
     		fprintf(stderr, "No pudo conectarse al proxy\n");
 

@@ -90,22 +90,24 @@ static struct manager_server* new_manager_server(int manager_server_fd) {
 	server->socks_fd = manager_server_fd;
 	server->socks_addr_len = sizeof(server->socks_addr);
 
+
 	server->state = MNG_SRV_HELLO_READ;
 
 	server->stm.initial   = MNG_SRV_HELLO_READ;
-  	server->stm.max_state = ERROR;
-  	server->stm.states = manager_server_describe_states();
-  	stm_init(&server->stm);
-  	
-  	buffer_init(&server->manager_server_read_buffer, N(server->raw_buff_a), server->raw_buff_a);
-  	buffer_init(&server->manager_server_write_buffer, N(server->raw_buff_b), server->raw_buff_b);
+  server->stm.max_state = ERROR;
+  server->stm.states = manager_server_describe_states();
 
-  	return server;
+  stm_init(&server->stm);
+  	
+  buffer_init(&server->manager_server_read_buffer, N(server->raw_buff_a), server->raw_buff_a);
+  buffer_init(&server->manager_server_write_buffer, N(server->raw_buff_b), server->raw_buff_b);
+
+  return server;
 }
 
 void manager_server_start (struct  selector_key *key) {
 
-	struct manager_server* state = NULL;
+  struct manager_server* state = NULL;
 
 	struct sockaddr_storage socks_addr;
     socklen_t socks_addr_len = sizeof(socks_addr);
@@ -126,9 +128,10 @@ void manager_server_start (struct  selector_key *key) {
     memcpy(&state->socks_addr, &socks_addr, socks_addr_len);
     state->socks_addr_len = socks_addr_len;
 
-    if(SELECTOR_SUCCESS != selector_register(key->s, manager, &manager_server_handler, OP_WRITE, state)) {
+    if(SELECTOR_SUCCESS != selector_register(key->s, manager, &manager_server_handler, OP_READ, state)) {
         goto fail;
     }
+
     return;
 	
 	fail:
@@ -177,6 +180,7 @@ static unsigned hello_manager_server_write(struct selector_key *key) {
 }
 
 static void hello_manager_server_read_init(const unsigned state, struct selector_key *key) {
+    fprintf(stdout, "ESTOY EN EL READ INIT\n");
     struct hello_manager_server_st *d = &ATTACHMENT(key)->server.hello;
     d->rb                              = &(ATTACHMENT(key)->manager_server_read_buffer);
     d->wb                              = &(ATTACHMENT(key)->manager_server_write_buffer);
@@ -331,25 +335,27 @@ static unsigned request_manager_server_read(struct selector_key *key) {
 }
 
 static const struct state_definition manager_server_statbl[] = {
-    {
-      .state            = MNG_SRV_HELLO_WRITE,
-      .on_arrival       = hello_manager_server_write_init,
-      .on_write_ready	= hello_manager_server_write,
-    },
+
     {
       .state            = MNG_SRV_HELLO_READ,
       .on_arrival       = hello_manager_server_read_init,
       .on_read_ready    = hello_manager_server_read,
     },
     {
-      .state            = MNG_SRV_REQUEST_WRITE,
-      .on_arrival       = request_manager_server_write_init,
-      .on_write_ready   = request_manager_server_write,
+      .state            = MNG_SRV_HELLO_WRITE,
+      .on_arrival       = hello_manager_server_write_init,
+      .on_write_ready = hello_manager_server_write,
     },
+
     {
       .state            = MNG_SRV_REQUEST_READ,
       .on_arrival       = request_manager_server_read_init,
       .on_read_ready   	= request_manager_server_read,
+    },
+    {
+      .state            = MNG_SRV_REQUEST_WRITE,
+      .on_arrival       = request_manager_server_write_init,
+      .on_write_ready   = request_manager_server_write,
     },
     {
       .state            = DONE,
