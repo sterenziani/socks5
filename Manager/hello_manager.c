@@ -12,7 +12,7 @@ extern enum hello_manager_state
 hello_manager_parser_feed(struct hello_manager_parser *p, const uint8_t b) {
     switch(p->state) {
         case hello_version:
-            if(0x05 == b) {
+            if(0x01 == b) {
                 p->state = hello_status;
             } else {
                 p->state = hello_error_unsupported_version;
@@ -98,18 +98,22 @@ extern int
 hello_manager_marshall(buffer *b, const uint8_t user[], const int user_len, 
     const uint8_t password[], const int pass_len) {
     size_t n;
+
     uint8_t *buff = buffer_write_ptr(b, &n);
     if(n < 5) {
         return -1;
     }
-    buff[0] = 0x05;
+
+    buff[0] = 0x01;
 
     buff[1] = user_len;
+
     for(int i = 0; i<user_len; i++) {
         buff[2 + i] = user[i];
     }
 
     buff[2 + user_len] = pass_len;
+
     for(int j = 0; j<pass_len; j++) {
         buff[3 + user_len + j] = password[j];
     }

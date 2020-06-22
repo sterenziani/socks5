@@ -9,7 +9,6 @@ request_manager_server_parser_init(struct request_manager_server_parser *p) {
     p->state     = request_server_version;
     p->remaining    = 0x00;
     p->pointer  = 0x00;
-    p->pool_size = 0x00;
 }
 
 extern enum request_manager_server_state
@@ -17,25 +16,30 @@ request_manager_server_parser_feed(struct request_manager_server_parser *p, cons
     switch(p->state) {
         case request_server_version:
             if(0x05 == b) {
-                p->state = request_server_status;
+                p->state = request_server_command;
             } else {
                 p->state = request_server_error_unsupported_version;
             }
             break;
 
         case request_server_command:
-            p->command = b;
             if(0x00 == b) {
                 p->state = request_server_user;
+                p->command = 0x00;
             }
             else if(0x01 == b) {
                 p->state = request_server_done;
+                p->command = 0x01;
             }
             else if(0x02 == b) {
                 p->state = request_server_done;
+                p->command = 0x02;
+
             }
             else if(0x03 == b) {
                 p->state = request_server_size;
+                p->command = 0x03;
+
             }
             else {
                 p->state = request_server_error_invalid_command;
@@ -77,8 +81,20 @@ request_manager_server_parser_feed(struct request_manager_server_parser *p, cons
             break;
 
         case request_server_size:
-            p->pool_size = b;
-            p->state = request_server_done;
+            if(p->remaining == 0) {
+                p->remaining = b;
+            }
+            else if(p->remaining == 1) {
+                p->remaining = 0x00;
+                p->clients_size[p->pointer] = b;
+                p->pointer = 0x00;
+                p->state = request_server_done;
+            }
+            else {
+                p->remaining --;
+                 p->clients_size[p->pointer] = b;
+                p->pointer ++;
+            }
             break;
 
         case request_server_done:
@@ -180,14 +196,15 @@ request_marshall_send_list(buffer *b, char* users[MAX_USERS][2]) {
         for(unsigned int j = 0; j < strlen(users[i][0]); j++) {
             buff[buff_position] = users[i][0][j] ;
             buff_position ++;
+
         }
 
     }
 
     buff[2] = i;
 
-    buffer_write_adv(b, buff_position - 1);
-    return (buff_position - 1);
+    buffer_write_adv(b, buff_position);
+    return buff_position;
 }
 
 extern int
@@ -200,29 +217,33 @@ request_marshall_send_metrics(buffer *b, const uint8_t t_connections[],
     }
     buff[0] = 0x05;
     buff[1] = 0x02;
-    buff[2] = sizeof(unsigned long);
+
+    unsigned int long_size = sizeof(unsigned long);
+    unsigned int int_size = sizeof(unsigned int);
+
+    buff[2] = long_size;
 
     unsigned int i = 0;
     unsigned int j = 0;
     unsigned int k = 0;
 
-    for(; i < sizeof(unsigned long); i++) {
+    for(; i < long_size; i++) {
         buff[3 + i] = t_connections[i];
     }
 
-    buff[3 + i] = sizeof(unsigned long);;
+    buff[3 + i] = int_size;
 
-    for(; j < sizeof(unsigned long); j++) {
+    for(; j < int_size; j++) {
         buff[4 + i +j] = a_connections[j];
     }
 
-    buff[4 + i + j] = sizeof(unsigned long);;
+    buff[4 + i + j] = long_size;
 
-    for(; k < sizeof(unsigned long); k++) {
+    for(; k < long_size; k++) {
         buff[5 + i + j +k] = bytes[k];
     }
 
-    buffer_write_adv(b, 4 + i + j + k);
+    buffer_write_adv(b, 5 + i + j + k);
     
-    return (4 + i + j + k);
+    return (5 + i + j + k);
 }

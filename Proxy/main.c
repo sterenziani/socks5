@@ -29,7 +29,7 @@
 #include "args.h"
 
 #define MAX_CONNECTIONS 1024  // should be larger than max_clients*2
-#define MAX_CLIENTS 500
+#define MAX_CLIENTS 1000
 
 #define DEFAULT_SELECTOR_TIMEOUT 10
 

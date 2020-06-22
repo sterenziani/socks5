@@ -25,7 +25,7 @@ all: $(EXECUTABLE)
 $(EXECUTABLE): $(OBJECTS) 
 	$(CC) -c -o $@.o $(CFLAGS) $(DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
-	$(CC) $(CFLAGS) Proxy/selector.c Proxy/buffer.c Proxy/stm.c Manager/*.c Proxy/auth.h
+	$(CC) $(CFLAGS) Proxy/buffer.c Manager/*.c
 
 .PHONY: doh-build
 doh-build:

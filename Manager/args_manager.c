@@ -57,7 +57,7 @@ usage(const char *progname) {
         "   -a <name>:<pass> Agregar un usuario y contraseña.\n"
         "   -m               Obtener métricas sobre el funcionamiento del servidor.\n"
         "   -U               Listar usuarios del proxy.\n"
-        "   -s <new size>    Cambiar tamaño de pool.\n"
+        "   -s <new size>    Cambiar tamaño de clients. Máximo 1000 clientes.\n"
         "   -v               Imprime información sobre la versión y termina.\n"
         ,
         progname);
@@ -67,6 +67,10 @@ usage(const char *progname) {
 void
 parse_manager_args(const int argc, char **argv, struct manager_args *args) {
     memset(args, 0, sizeof(*args)); // sobre todo para setear en null los punteros de users
+
+    bool auth = false;
+
+    bool flag = false;
 
     args->socks_addr = "127.0.0.1";
     args->socks_port = 8080;
@@ -92,7 +96,8 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                 args->socks_port = port(optarg);
                 break;
             case 'u':
-                user(optarg, &(args->auth)); 
+                user(optarg, &(args->auth));
+                auth = true;
                 break;           
             case 'a':
                 if(args->command != 0xFF) {
@@ -101,7 +106,8 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                     exit(1);
                 }
                 user(optarg, &(args->params.new_user));
-                args->command = 0x00;  
+                args->command = 0x00;
+                flag = true;
                 break;
             case 'm':
                 if(args->command != 0xFF) {
@@ -110,6 +116,7 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                     exit(1);
                 }
                 args->command = 0x02;
+                flag = true;
                 break;
             case 'U':
                 if(args->command != 0xFF) {
@@ -118,6 +125,7 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                     exit(1);
                 }
                 args->command = 0x01;
+                flag = true;
                 break;
                 case 's':
                 if(args->command != 0xFF) {
@@ -126,11 +134,12 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                     exit(1);
                 }
                 args->command = 0x03;
-                if(atoi(optarg) > 255) {
-                    fprintf(stderr, "Tamaño máximo de pool es 255\n");
+                if(atoi(optarg) > 1000) {
+                    fprintf(stderr, "Tamaño máximo de clientes es 1000\n");
                     exit(1);
                 }
-                args->params.new_pool_size = atoi(optarg);
+                args->params.new_clients_size = atoi(optarg);
+                flag = true;
                 break; 
             case 'v':
                 version();
@@ -148,6 +157,16 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
             fprintf(stderr, "%s ", argv[optind++]);
         }
         fprintf(stderr, "\n");
+        exit(1);
+    }
+
+    else if(!flag) {
+        fprintf(stderr, "Se necesita un comando para iniciar el manager\n Use el flag -h para mas informacion\n");
+        exit(1);
+    }
+
+    else if(!auth) {
+        fprintf(stderr, "Se necesita identificar como usuario para iniciar el manager\n Use el flag -h para mas informacion\n");
         exit(1);
     }
 }
