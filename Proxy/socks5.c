@@ -619,18 +619,27 @@ static void * request_resolve(void *data){
     {
       hints.ai_family = AF_INET;
       solveDomain(doh, sock->origin_addr, buff, &hints, &sock->origin_resolution);
-    }
-    while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET)
-    {
-      p = sock->origin_resolution;
-      sock->origin_resolution = sock->origin_resolution->ai_next;
-      p->ai_next = NULL;
-      freedohinfo(p);
+      while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET)
+      {
+        p = sock->origin_resolution;
+        sock->origin_resolution = sock->origin_resolution->ai_next;
+        p->ai_next = NULL;
+        freedohinfo(p);
+      }
     }
     // Plan C = Use getaddrinfo
     if(sock->origin_resolution == NULL)
     {
+      printf("plan C: getaddrinfo");
       getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
+
+      while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
+      {
+        p = sock->origin_resolution;
+        sock->origin_resolution = sock->origin_resolution->ai_next;
+        p->ai_next = NULL;
+        freeaddrinfo(p);
+      }
     }
     selector_notify_block(key->s, key->fd);
     free(data);
@@ -866,54 +875,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
     if (selector_fd_set_nio(sock->origin_fd) == -1) {
       goto finally;
     }
-
-    int connect_result = 0;
-    struct addrinfo *aux;
-    selector_status st;
-    do{
-      if(connect(sock->origin_fd, (const struct sockaddr *) &sock->origin_addr_storage, sock->origin_resolution->ai_addrlen) != 0 && errno != EINPROGRESS){
-        aux = sock->origin_resolution->ai_next;
-        sock->origin_resolution = sock->origin_resolution->ai_next;
-        aux->ai_next = NULL;
-        freedohinfo(aux);
-      }else if(errno == EINPROGRESS){
-        // espero
-        st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
-        if(SELECTOR_SUCCESS != st) {
-          goto finally;
-        }
-
-        int option = 0;
-        socklen_t optionLen = sizeof(option);
-
-        if(getsockopt(sock->client_fd, SOL_SOCKET, SO_ERROR, &option, &optionLen) == -1 || option!=0){
-      		// error en el connect
-          aux = sock->origin_resolution->ai_next;
-          sock->origin_resolution = sock->origin_resolution->ai_next;
-          aux->ai_next = NULL;
-          freedohinfo(aux);
-        }else{
-          connect_result = 1;
-        }
-
-      }else{
-        // connect dio 0
-        connect_result = 1;
-      }
-    }while(!connect_result && sock->origin_resolution!=NULL);
-
-    if(sock->origin_resolution!=NULL){
-      d->parser.error = request_connection_fail;
-      fprintf(stdout, "ERROR!\n");
-      abort();
-    }
-
-    st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
-    if(SELECTOR_SUCCESS != st) {
-      goto finally;
-    }
-
-    /*
     if (-1 == connect(sock->origin_fd, (const struct sockaddr *) &sock->origin_addr_storage, sock->origin_resolution->ai_addrlen))
     {
       if(errno == EINPROGRESS) {
@@ -932,7 +893,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
       fprintf(stdout, "ERROR!\n");
       abort();
     }
-    */
     sock->references++;
     if(disectors_enabled)
       initialize_communication_parser(sock);
