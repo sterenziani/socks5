@@ -156,6 +156,7 @@ struct socks5 {
 
     // ORIGIN
     struct addrinfo* origin_resolution;
+    int origin_resolved_by_doh;
     char origin_addr[255];
     int origin_port;
     struct sockaddr_storage origin_addr_storage;
@@ -630,7 +631,8 @@ static void * request_resolve(void *data){
     // Plan C = Use getaddrinfo
     if(sock->origin_resolution == NULL)
     {
-      printf("plan C: getaddrinfo");
+      fprintf(stdout,"Dominio \"%s\" no pudo ser resuelto por DoH, usando getaddrinfo\n",sock->origin_addr);
+      sock->origin_resolved_by_doh = 0;
       getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
 
       while(sock->origin_resolution != NULL && sock->origin_resolution->ai_family != AF_INET && sock->origin_resolution->ai_family != AF_INET6)
@@ -640,6 +642,8 @@ static void * request_resolve(void *data){
         p->ai_next = NULL;
         freeaddrinfo(p);
       }
+    }else{
+      sock->origin_resolved_by_doh = 1;
     }
     selector_notify_block(key->s, key->fd);
     free(data);
@@ -888,7 +892,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
         aux = sock->origin_resolution;
         sock->origin_resolution = sock->origin_resolution->ai_next;
         aux->ai_next = NULL;
-        freedohinfo(aux);
+        (sock->origin_resolved_by_doh)?freedohinfo(aux):freeaddrinfo(aux);
       }else{
 
         if(sock->origin_resolution->ai_family != socket_type){
@@ -910,7 +914,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
            aux = sock->origin_resolution;
            sock->origin_resolution = sock->origin_resolution->ai_next;
            aux->ai_next = NULL;
-           freedohinfo(aux);
+           (sock->origin_resolved_by_doh)?freedohinfo(aux):freeaddrinfo(aux);
          }else if(errno == EINPROGRESS){
            st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
            if(SELECTOR_SUCCESS != st) {
@@ -924,7 +928,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
            aux = sock->origin_resolution;
            sock->origin_resolution = sock->origin_resolution->ai_next;
            aux->ai_next = NULL;
-           freedohinfo(aux);
+           (sock->origin_resolved_by_doh)?freedohinfo(aux):freeaddrinfo(aux);
          }else{
            connect_success = 1;
          }

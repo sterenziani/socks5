@@ -14,7 +14,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   const struct doh* doh_curr = (dohAddr==NULL)?&defaultDoh:dohAddr;
 
   if(getDohServer(doh_curr, &server)!=0){
-    perror("invalid doh address");
+    // perror("invalid doh address");
     return -1;
   }
 
@@ -31,7 +31,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   // create a socket
   sockfd = socket(server.ss_family, SOCK_STREAM, 0);
   if(sockfd<0){
-    perror("Socket opening failed!\n");
+    // perror("Socket opening failed!\n");
     return -1;
   }
   fcntl(sockfd, F_SETFL, fcntl(sockfd, F_GETFL, 0) | O_NONBLOCK);
@@ -43,13 +43,13 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
   // connect to socket
 	if (connect(sockfd, (struct sockaddr *)&server, sizeof(struct sockaddr)) < 0 && errno != EINPROGRESS){
-		perror("Connection failed");
+		// perror("Connection failed");
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
 		return -1;
 	} else if(errno == EINPROGRESS) {
     if(pselect(sockfd+1,NULL,&socketSet,NULL,&doh_timeout,&blockset)==-1){
-      perror("Select error");
+      // perror("Select error");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
       return -1;
@@ -59,20 +59,20 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     socklen_t optionLen = sizeof(option);
 
     if(getsockopt(sockfd, SOL_SOCKET, SO_ERROR, &option, &optionLen) == -1){
-  		perror("Couldn't get socket options");
+  		// perror("Couldn't get socket options");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
   		return -1;
     }else if(option != 0){
       errno = option;
-  		perror("Connection failed");
+  		// perror("Connection failed");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
   		return -1;
     }
 
     if(!FD_ISSET(sockfd, &socketSet)){
-      perror("Connect timed out");
+      // perror("Connect timed out");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
       return -1;
@@ -98,7 +98,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   buffer_init(&request, N(direct_buff_req), direct_buff_req);
 
   if(httpEncode(doh_curr, req, m, contentLength_str) < 0){
-    perror("Encoding http message failed\n");
+    // perror("Encoding http message failed\n");
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
     return -1;
@@ -107,7 +107,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   // connect to HTTP
   ssize_t bytes_sent = sendHttpMessage(sockfd,req);
   if(bytes_sent<0){
-    perror("send http message failed");
+    // perror("send http message failed");
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
     return -1;
@@ -129,7 +129,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
     //hacer el parseo
     if((end = feedParser(myDohParser,res))<0){
-      perror("Parsing error: ");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
@@ -139,7 +138,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     }
 
     if(pselect(sockfd+1,&socketSet,NULL,NULL,&doh_timeout,&blockset)==-1){
-      perror("Select error");
+      // perror("Select error");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
@@ -149,7 +148,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     if(FD_ISSET(sockfd, &socketSet)){
 
       if(!buffer_can_write(res)){
-        perror("Can't write on response buffer");
+        // perror("Can't write on response buffer");
         parser_doh_destroy(myDohParser);
         shutdown(sockfd, SHUT_RDWR);
         close(sockfd);
@@ -160,7 +159,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
       n = read(sockfd, write_dir, max_write);		//Reads the buffer
       if (n < 0){
-        perror("Error on reading");
+        // perror("Error on reading");
         parser_doh_destroy(myDohParser);
         shutdown(sockfd, SHUT_RDWR);
         close(sockfd);
@@ -170,7 +169,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
     }else{
       // timed out
-      perror("Connection timed out");
+      // perror("Connection timed out");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
@@ -183,7 +182,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
   //hacer el parseo
   if(end!=0 && (end = feedParser(myDohParser,res))<0){
-    perror("Parsing error: ");
     parser_doh_destroy(myDohParser);
     shutdown(sockfd, SHUT_RDWR);
     close(sockfd);
@@ -193,7 +191,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
   int err, ipv4_exists=0;
   *ret_addrInfo = parser_doh_getAddrInfo(myDohParser, &err);
   struct addrinfo *aux = *ret_addrInfo;
-  struct addrinfo *last = aux;
 
   if(err==0){
 
@@ -214,7 +211,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       aux->ai_socktype = SOCK_STREAM;
 
       aux = aux->ai_next;
-      last = aux;
     }
   }
   parser_doh_destroy(myDohParser);
@@ -232,7 +228,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     // encoding http
     buffer_reset(req);
     if(httpEncode(doh_curr, req, m, contentLength_str) < 0){
-      perror("Encoding http message failed\n");
+      // perror("Encoding http message failed\n");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
       return -1;
@@ -241,7 +237,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
     // connect to HTTP
     bytes_sent = sendHttpMessage(sockfd,req);
     if(bytes_sent<0){
-      perror("send http message failed");
+      // perror("send http message failed");
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
       return -1;
@@ -258,7 +254,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
       //hacer el parseo
       if((end = feedParser(myDohParser,res))<0){
-        perror("Parsing error: ");
         parser_doh_destroy(myDohParser);
         shutdown(sockfd, SHUT_RDWR);
         close(sockfd);
@@ -268,7 +263,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       }
 
       if(pselect(sockfd+1,&socketSet,NULL,NULL,&doh_timeout,&blockset)==-1){
-        perror("Select error");
+        // perror("Select error");
         parser_doh_destroy(myDohParser);
         shutdown(sockfd, SHUT_RDWR);
         close(sockfd);
@@ -278,7 +273,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
       if(FD_ISSET(sockfd, &socketSet)){
 
         if(!buffer_can_write(res)){
-          perror("Can't write on response buffer");
+          // perror("Can't write on response buffer");
           parser_doh_destroy(myDohParser);
           shutdown(sockfd, SHUT_RDWR);
           close(sockfd);
@@ -289,7 +284,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
         n = read(sockfd, write_dir, max_write);		//Reads the buffer
         if (n < 0){
-          perror("Error on reading");
+          // perror("Error on reading");
           parser_doh_destroy(myDohParser);
           shutdown(sockfd, SHUT_RDWR);
           close(sockfd);
@@ -299,7 +294,7 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
       }else{
         // timed out
-        perror("Connection timed out");
+        // perror("Connection timed out");
         parser_doh_destroy(myDohParser);
         shutdown(sockfd, SHUT_RDWR);
         close(sockfd);
@@ -312,7 +307,6 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
 
     //hacer el parseo
     if(end!=0 && (end = feedParser(myDohParser,res))<0){
-      perror("Parsing error: ");
       parser_doh_destroy(myDohParser);
       shutdown(sockfd, SHUT_RDWR);
       close(sockfd);
@@ -459,7 +453,7 @@ feedQuestion(const char* host, uint8_t qtype1, uint8_t qtype2, buffer *b){
     }
 
     if(labelLen > 63){
-      perror("Domain label is too long");
+      // perror("Domain label is too long");
       return -1;
     }
 
@@ -477,7 +471,7 @@ feedQuestion(const char* host, uint8_t qtype1, uint8_t qtype2, buffer *b){
     }
 
     if(octetCount>255){
-      perror("Domain Name is too long");
+      // perror("Domain Name is too long");
       return -1;
     }
 
@@ -522,7 +516,7 @@ httpEncode(const struct doh* dohAddr, buffer *req, buffer *dnsMessage, char *con
   }
 
   if(!buffer_can_write(req)){
-    perror("host name is too long");
+    // perror("host name is too long");
     return -1;
   }
 

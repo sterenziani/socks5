@@ -151,8 +151,8 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
             if(p->statusCode < 200 || p->statusCode >= 300){
               errno = EFAULT;
               char error_msg[ERROR_BUFFER];
-              snprintf(error_msg,sizeof(error_msg),"DOH Request; doh request returned %u",p->statusCode);
-              perror(error_msg);
+              //snprintf(error_msg,sizeof(error_msg),"DOH Request; doh request returned %u",p->statusCode);
+              //perror(error_msg);
               p->stage = STAGE_ERROR;
               p->status_http = HTTP_INVALID_CODE;
             }
@@ -213,7 +213,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
           }
         }else{
           errno = EFAULT;
-          perror("DOH request; Content Type is not application/dns-message");
+          //perror("DOH request; Content Type is not application/dns-message");
           p->stage = STAGE_ERROR;
           p->status_http = HTTP_INVALID_CT;
         }
@@ -248,8 +248,8 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
               p->stage = STAGE_ERROR;
               errno = EFAULT;
               char error_msg[ERROR_BUFFER];
-              snprintf(error_msg,sizeof(error_msg),"DOH Request; dns message reply code returned %u",p->statusCode);
-              perror(error_msg);
+              //snprintf(error_msg,sizeof(error_msg),"DOH Request; dns message reply code returned %u",p->statusCode);
+              //perror(error_msg);
             }
             break;
           case 2:
@@ -271,7 +271,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
               p->prev_dnsIndex = 0;
             }else{
               //error
-              perror("DOH Request; dns packet has invalid format");
+              //perror("DOH Request; dns packet has invalid format");
               errno = EFAULT;
               p->stage=STAGE_ERROR;
             }
@@ -319,7 +319,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
                 p->prev_dnsIndex = 0;
               }else{
                 //error
-                perror("DOH Request; dns packet has invalid format");
+                //perror("DOH Request; dns packet has invalid format");
                 errno = EFAULT;
                 p->stage=STAGE_ERROR;
               }
@@ -457,7 +457,7 @@ parser_doh_feed(struct parser_doh *p, const uint8_t c){
             int aux = hexCharToInt(c);
             if(aux<0){
               errno = EFAULT;
-              perror("DOH Request; Invalid chunked format");
+              //perror("DOH Request; Invalid chunked format");
               p->stage = STAGE_ERROR;
               p->status_http = DNS_ERROR;
             }else{
