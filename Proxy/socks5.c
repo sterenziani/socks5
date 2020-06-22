@@ -692,8 +692,24 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
                   return ERROR;
                 }
               }
-              else
+              else if(errno == ECONNREFUSED)
+              {
                 d->parser.error = request_connection_fail;
+              }
+              else if(errno == ENETUNREACH)
+              {
+                d->parser.error = request_network_unreachable;
+              }
+              else if(errno == ETIMEDOUT)
+              {
+                d->parser.error = request_ttl_expired;
+              }
+              else if(errno == EAFNOSUPPORT)
+              {
+                d->parser.error = request_unsupported_atyp;
+              }
+              else
+                d->parser.error = request_host_unreachable;
             }
             sock->references++;
             sock->origin_port = ntohs(address.sin_port);
@@ -755,8 +771,24 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
                 return ERROR;
               }
             }
-            else
+            else if(errno == ECONNREFUSED)
+            {
               d->parser.error = request_connection_fail;
+            }
+            else if(errno == ENETUNREACH)
+            {
+              d->parser.error = request_network_unreachable;
+            }
+            else if(errno == ETIMEDOUT)
+            {
+              d->parser.error = request_ttl_expired;
+            }
+            else if(errno == EAFNOSUPPORT)
+            {
+              d->parser.error = request_unsupported_atyp;
+            }
+            else
+              d->parser.error = request_host_unreachable;
           }
           sock->references++;
           sock->origin_port = ntohs(address.sin6_port);
@@ -878,8 +910,24 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
           goto finally;
         }
       }
-      else
+      else if(errno == ECONNREFUSED)
+      {
         d->parser.error = request_connection_fail;
+      }
+      else if(errno == ENETUNREACH)
+      {
+        d->parser.error = request_network_unreachable;
+      }
+      else if(errno == ETIMEDOUT)
+      {
+        d->parser.error = request_ttl_expired;
+      }
+      else if(errno == EAFNOSUPPORT)
+      {
+        d->parser.error = request_unsupported_atyp;
+      }
+      else
+        d->parser.error = request_host_unreachable;
     } else {
       fprintf(stdout, "ERROR!\n");
       abort();
@@ -970,7 +1018,7 @@ static unsigned request_resolve_done(struct selector_key *key) {
       fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
       freedohinfo(sock->origin_resolution);
       sock->origin_resolution = 0;
-      d->parser.error = request_connection_fail;
+      d->parser.error = request_host_unreachable;
     }
     else
     {

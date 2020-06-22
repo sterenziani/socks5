@@ -104,7 +104,7 @@ int create_ipv6_socket(struct socks5args* args)
       return -1;
   }
   setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
-  setsockopt(server, SOL_IPV6, IPV6_V6ONLY, &(int){ 1 }, sizeof(int));
+  setsockopt(server, IPPROTO_IPV6, IPV6_V6ONLY, &(int){ 1 }, sizeof(int));
   fprintf(stdout, "Listening on IPv6 TCP port %d\n", args->socks_port);
   if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
       return -2;
