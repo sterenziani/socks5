@@ -903,6 +903,7 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
           if (selector_fd_set_nio(sock->origin_fd) == -1) {
             goto finally;
           }
+          socket_type = sock->origin_resolution->ai_family;
         }
 
         if (connect(sock->origin_fd, (const struct sockaddr *) sock->origin_resolution->ai_addr, sock->origin_resolution->ai_addrlen) != 0 && errno != EINPROGRESS){
