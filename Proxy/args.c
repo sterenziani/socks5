@@ -16,7 +16,7 @@ port(const char *s) {
      if (end == s|| '\0' != *end
         || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
         || sl < 0 || sl > USHRT_MAX) {
-         fprintf(stderr, "port should in in the range of 1-65536: %s\n", s);
+         fprintf(stderr, "El puerto debe estar en el rango 1-65536: %s\n", s);
          exit(1);
          return 1;
      }
@@ -27,7 +27,7 @@ static void
 user(char *s, struct users *user) {
     char *p = strchr(s, ':');
     if(p == NULL) {
-        fprintf(stderr, "password not found\n");
+        fprintf(stderr, "Contraseña no encontrada\n");
         exit(1);
     } else {
         *p = 0;
@@ -42,13 +42,12 @@ static void
 version(void) {
     fprintf(stderr, "socksv5 version 1.0\n"
                     "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
-                    "AQUI VA LA LICENCIA\n");
 }
 
 static void
 usage(const char *progname) {
     fprintf(stderr,
-        "Usage: %s [OPTION]...\n"
+        "Uso: %s [OPCIÓN]...\n"
         "\n"
         "   -h               Imprime la ayuda y termina.\n"
         "   -l <SOCKS addr>  Dirección donde servirá el proxy SOCKS.\n"
@@ -58,11 +57,11 @@ usage(const char *progname) {
         "   -u <name>:<pass> Usuario y contraseña de usuario que puede usar el proxy. Hasta 10.\n"
         "   -v               Imprime información sobre la versión y termina.\n"
         "\n"
-        "   --doh-ip    <ip>    \n"
-        "   --doh-port  <port>  XXX\n"
-        "   --doh-host  <host>  XXX\n"
-        "   --doh-path  <host>  XXX\n"
-        "   --doh-query <host>  XXX\n"
+        "   --doh-ip    <ip>    IP del servidor DOH\n"
+        "   --doh-port  <port>  Puerto donde servirá el servidor DOH\n"
+        "   --doh-host  <host>  Host donde servirá el servidor DOH\n"
+        "   --doh-path  <path>  Path del servidor DOH\n"
+        "   --doh-query <query> Nombre del parámetro en caso de resolver requests DOH con GET\n"
 
         "\n",
         progname);
@@ -126,7 +125,7 @@ parse_args(const int argc, char **argv, struct socks5args *args) {
                 break;
             case 'u':
                 if(nusers >= MAX_USERS) {
-                    fprintf(stderr, "maximun number of command line users reached: %d.\n", MAX_USERS);
+                    fprintf(stderr, "Se alcanzó la cantidad máxima de usuarios: %d.\n", MAX_USERS);
                     exit(1);
                 } else {
                     user(optarg, args->users + nusers);
@@ -153,13 +152,13 @@ parse_args(const int argc, char **argv, struct socks5args *args) {
                 args->doh.query = optarg;
                 break;
             default:
-                fprintf(stderr, "unknown argument %d.\n", c);
+                fprintf(stderr, "Argumento inválido %d.\n", c);
                 exit(1);
         }
 
     }
     if (optind < argc) {
-        fprintf(stderr, "argument not accepted: ");
+        fprintf(stderr, "Argumento no aceptado: ");
         while (optind < argc) {
             fprintf(stderr, "%s ", argv[optind++]);
         }

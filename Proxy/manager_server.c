@@ -26,6 +26,7 @@
 static const struct state_definition* manager_server_describe_states(void);
 
 unsigned int buffer_size;
+uint8_t auth;
 static bool done = false;
 
 enum manager_server_state {
@@ -63,7 +64,7 @@ static struct manager_server {
 	int socks_fd;
 
 	char username[255];
-    char password[255];
+  char password[255];
 
 	uint8_t raw_buff_a[2048];
     uint8_t raw_buff_b[2048];
@@ -110,7 +111,7 @@ void manager_server_start (struct  selector_key *key) {
   struct manager_server* state = NULL;
 
 	struct sockaddr_storage socks_addr;
-    socklen_t socks_addr_len = sizeof(socks_addr);
+  socklen_t socks_addr_len = sizeof(socks_addr);
 
     const int manager = accept(key->fd, (struct sockaddr*) &socks_addr, &socks_addr_len);
     if(manager == -1) {
@@ -155,6 +156,9 @@ static unsigned hello_manager_server_write(struct selector_key *key) {
   unsigned ret = 	MNG_SRV_REQUEST_READ;
   struct hello_manager_server_st *d = &ATTACHMENT(key)->server.hello;
   size_t  count;
+
+  auth_marshall(d->wb, auth);
+
   uint8_t *ptr = buffer_read_ptr(d->wb, &count);
   if(ptr[1])
   {
@@ -180,7 +184,6 @@ static unsigned hello_manager_server_write(struct selector_key *key) {
 }
 
 static void hello_manager_server_read_init(const unsigned state, struct selector_key *key) {
-    fprintf(stdout, "ESTOY EN EL READ INIT\n");
     struct hello_manager_server_st *d = &ATTACHMENT(key)->server.hello;
     d->rb                              = &(ATTACHMENT(key)->manager_server_read_buffer);
     d->wb                              = &(ATTACHMENT(key)->manager_server_write_buffer);
@@ -190,12 +193,13 @@ static void hello_manager_server_read_init(const unsigned state, struct selector
 
 static unsigned hello_manager_server_process(const struct hello_manager_server_st* d) {
     unsigned ret = 	MNG_SRV_HELLO_WRITE;
-    uint8_t m = user_pass_valid(d->parser.username, d->parser.ulen, d->parser.password, d->parser.plen);
+    auth = user_pass_valid(d->parser.username, d->parser.ulen, d->parser.password, d->parser.plen);
     return ret;
 }
 
 static unsigned hello_manager_server_read(struct selector_key *key) {
   struct hello_manager_server_st *d = &ATTACHMENT(key)->server.hello;
+  struct manager_server *manager = ATTACHMENT(key);
   unsigned ret = MNG_SRV_HELLO_WRITE;
   bool error = false;
   uint8_t *ptr;
@@ -203,12 +207,14 @@ static unsigned hello_manager_server_read(struct selector_key *key) {
   ssize_t  n;
   ptr = buffer_write_ptr(d->rb, &count);
   n = recv(key->fd, ptr, count, 0);
+
   if(n > 0) {
       buffer_write_adv(d->rb, n);
       const enum auth_state st = auth_consume(d->rb, &d->parser, &error);
+
       if(auth_is_done(st, 0)) {
-          if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
-              ret = hello_manager_server_process(d);
+          ret = hello_manager_server_process(d);
+          if(SELECTOR_SUCCESS == selector_set_interest_key(key, (1 << 2))) {
               if(ret == MNG_SRV_HELLO_WRITE)
               {
                 memcpy(ATTACHMENT(key)->username, d->parser.username, d->parser.ulen);
@@ -238,20 +244,18 @@ static unsigned request_manager_server_write(struct selector_key* key) {
 	struct request_manager_server_st *d = &ATTACHMENT(key)->server.request;
 	unsigned ret = DONE;
     size_t  count;
-    uint8_t *ptr = buffer_write_ptr(d->wb, &count);
+    uint8_t *ptr = buffer_read_ptr(d->wb, &count);
     if(count < 3) {
       ret = ERROR;
     }
 
     size_t n = send(key->fd, ptr, count, MSG_DONTWAIT);
+
     if(n < 3) {
       ret = ERROR;
     }
 
-    buffer_write_adv(d->wb, n);
-    if(SELECTOR_SUCCESS != selector_set_interest_key(key, OP_READ)){
-        ret = ERROR;
-    }
+    buffer_read_adv(d->wb, n);
 
     return ret;
 }
@@ -263,8 +267,17 @@ static void request_manager_server_read_init(const unsigned state, struct select
    	request_manager_server_parser_init(&d->parser);
 }
 
+static void unsigned_to_byte_converter(unsigned long number, uint8_t aux[], int size) {
+  aux[0] = (uint8_t) number;
+  for(int i = 1; i < size; i++) {
+    aux[i] = (uint8_t) (number >> i*8);  
+  }
+  return;
+}
+
 static void request_manager_server_process(struct request_manager_server_st* d, struct selector_key *key, buffer *buff) {
-	if(d->parser.command == 0x00) {
+
+  if(d->parser.command == 0x00) {
     	if(d->parser.user != NULL && d->parser.pass != NULL)
 		    {	
 		    	int i = 0;
@@ -272,7 +285,7 @@ static void request_manager_server_process(struct request_manager_server_st* d, 
 		    		i++;
 		    	}
 
-		    	if(i == MAX_USERS) {
+		    	if(i >= MAX_USERS) {
 		    		request_marshall_change(buff, 0xFF, 0x00);
 		    		return;
 		    	}
@@ -286,21 +299,29 @@ static void request_manager_server_process(struct request_manager_server_st* d, 
 		    }
 		}
 
-	if(d->parser.command == 0x01) {
+	else if(d->parser.command == 0x01) {
 		request_marshall_send_list(buff, registered_users);
 	}
 
-	if(d->parser.command == 0x02) {
-		uint8_t * t_connections = (uint8_t*) &total_connections;
-		uint8_t * a_connections = (uint8_t*) &active_connections;
-		uint8_t * bytes = (uint8_t*) &transferred_bytes;
-		request_marshall_send_metrics(buff, t_connections, a_connections, bytes);
+	else if(d->parser.command == 0x02) {
+		uint8_t t_connections[8]; 
+    unsigned_to_byte_converter(total_connections, t_connections, 8);
+		uint8_t a_connections[4]; 
+    unsigned_to_byte_converter(active_connections, a_connections, 4);
+		uint8_t bytes_arr[8]; 
+    unsigned_to_byte_converter(transferred_bytes, bytes_arr, 8);
+		request_marshall_send_metrics(buff, t_connections, a_connections, bytes_arr);
 	}
 
-	if(d->parser.command == 0x03) {
-		fprintf(stdout, "A implementar en el futuro cercano\n");
+	else if(d->parser.command == 0x03) {
+		max_clients = *((unsigned int*)(void*) d->parser.clients_size);
 		request_marshall_change(buff, 0x00, 0x00);
 	}
+
+  else {
+    fprintf(stdout, "Comando no aceptado");
+    abort();
+  }
 
 }
 
@@ -312,16 +333,16 @@ static unsigned request_manager_server_read(struct selector_key *key) {
     size_t  count;
     ssize_t  n;
 
-    ptr = buffer_read_ptr(d->rb, &count);
+    ptr = buffer_write_ptr(d->rb, &count);
     n = recv(key->fd, ptr, count, 0);
 
     if(n > 0) {
-        buffer_read_adv(d->rb, n);
+        buffer_write_adv(d->rb, n);
 
         const enum request_manager_server_state st = request_manager_server_consume(d->rb, &d->parser, &error);
 
         if(request_manager_server_is_done(st, 0)) {
-            if(SELECTOR_SUCCESS == selector_set_interest_key(key, OP_WRITE)) {
+            if(SELECTOR_SUCCESS == selector_set_interest_key(key, (1 << 2))) {
                 request_manager_server_process(d, key, d->wb);
             }
          	else

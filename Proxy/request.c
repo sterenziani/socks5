@@ -125,7 +125,7 @@ request_parser_feed(struct request_parser *p, const uint8_t b) {
         case request_error_reserved:
             break;
         default:
-            fprintf(stderr, "unknown state %d\n", p->state);
+            fprintf(stderr, "Estado desconocido %d\n", p->state);
             abort();
     }
 
@@ -179,24 +179,24 @@ request_error(const struct request_parser *p) {
     char *ret;
     switch (p->state) {
         case request_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         case request_error_unsupported_command:
-            ret = "unsupported command";
+            ret = "Comando no soportado";
             break;
         case request_error_unsupported_addr_type:
-            ret = "unsupported address type";
+            ret = "Tipo de dirección no soportada";
             break;
         case request_error_invalid_address:
-            ret = "invalid address";
+            ret = "Dirección inválida";
             break;
         case request_error_invalid_port:
-            ret = "invalid port";
+            ret = "Puerto inválido";
             break;
         case request_error_reserved:
-            ret = "reserved's value must be 0x00";
+            ret = "El valor reservado debe ser 0x00";
         case request_error_mem_alloc:
-        	ret = "memory allocation unsuccesful";
+        	ret = "Asignación de memoria fallida";
         break;
         default:
             ret = "";

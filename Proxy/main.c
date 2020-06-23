@@ -28,8 +28,7 @@
 #include "selector.h"
 #include "args.h"
 
-#define MAX_CONNECTIONS 1024  // should be larger than max_clients*2
-#define MAX_CLIENTS 500
+#define MAX_CONNECTIONS 1024
 
 #define DEFAULT_SELECTOR_TIMEOUT 10
 
@@ -115,8 +114,8 @@ int create_ipv6_socket(struct socks5args* args)
   return server;
 }
 
-static int create_manager_socket(struct socks5args* args) {
-  
+static int create_ipv4_manager_socket(struct socks5args* args) {
+
   struct sockaddr_in addr;
   memset(&addr, 0, sizeof(addr));
 
@@ -141,6 +140,8 @@ static int create_manager_socket(struct socks5args* args) {
     return -1;
   }
 
+  setsockopt(mng_fd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+
   if(bind(mng_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
     return -2;
   }
@@ -149,7 +150,52 @@ static int create_manager_socket(struct socks5args* args) {
     return -3;
   }
 
-  fprintf(stdout, "Escuchando a admin en puerto %d", args->mng_port);
+  fprintf(stdout, "Escuchando a admin en puerto %d IPv4", args->mng_port);
+  return mng_fd;
+}
+
+static int create_ipv6_manager_socket(struct socks5args* args) {
+
+  struct sockaddr_in6 addr;
+  memset(&addr, 0, sizeof(addr));
+
+  struct sctp_initmsg initmsg;
+
+  addr.sin6_family = AF_INET6;
+
+  if(strcmp(args->mng_addr, "0.0.0.0") != 0)
+    inet_pton(AF_INET6, args->mng_addr, &addr.sin6_addr.s6_addr);
+  else
+    inet_pton(AF_INET6, "::", &addr.sin6_addr.s6_addr);
+  addr.sin6_port = htons(args->mng_port);
+
+  int mng_fd = socket(AF_INET6, SOCK_STREAM, IPPROTO_SCTP);
+
+  if(mng_fd < 0) {
+    return -1;
+  }
+
+  memset (&initmsg, 0, sizeof (initmsg));
+  initmsg.sinit_num_ostreams = 5;
+  initmsg.sinit_max_instreams = 5;
+  initmsg.sinit_max_attempts = 4;
+
+  if(setsockopt(mng_fd, IPPROTO_SCTP, SCTP_INITMSG, &initmsg, sizeof(initmsg))){
+    return -1;
+  }
+
+  setsockopt(mng_fd, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
+  setsockopt(mng_fd, IPPROTO_IPV6, IPV6_V6ONLY, &(int){ 1 }, sizeof(int));
+
+  if(bind(mng_fd, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
+    return -2;
+  }
+
+  if (listen(mng_fd, 5) < 0) {
+    return -3;
+  }
+
+  fprintf(stdout, "Escuchando a admin en puerto %d IPv6", args->mng_port);
   return mng_fd;
 }
 
@@ -259,7 +305,85 @@ int main(const int argc, char **argv) {
       }
     }
 
-    int manager = create_manager_socket(args);
+    int manager;
+    int manager2 = -4;
+    if(strcmp(args->mng_addr, "0.0.0.0") == 0)
+    {
+      manager = create_ipv6_manager_socket(args);
+      if(manager == -1)
+      {
+        err_msg = "unable to create socket";
+        goto finally;
+      }
+      else if(manager == -2)
+      {
+        err_msg = "unable to bind socket";
+        goto finally;
+      }
+      else if(manager == -3)
+      {
+        err_msg = "unable to listen";
+        goto finally;
+      }
+
+      manager2 = create_ipv4_manager_socket(args);
+      if(manager2 == -1)
+      {
+        err_msg = "unable to create socket";
+        goto finally;
+      }
+      else if(manager2 == -2)
+      {
+        err_msg = "unable to bind socket";
+        goto finally;
+      }
+      else if(manager2 == -3)
+      {
+        err_msg = "unable to listen";
+        goto finally;
+      }
+    }
+    else
+    {
+      if(strchr(args->mng_addr, ':') != NULL)
+      {
+        manager = create_ipv6_manager_socket(args);
+        if(manager == -1)
+        {
+          err_msg = "unable to create socket";
+          goto finally;
+        }
+        else if(manager == -2)
+        {
+          err_msg = "unable to bind socket";
+          goto finally;
+        }
+        else if(manager == -3)
+        {
+          err_msg = "unable to listen";
+          goto finally;
+        }
+      }
+      else
+      {
+        manager = create_ipv4_manager_socket(args);
+        if(manager == -1)
+        {
+          err_msg = "unable to create socket";
+          goto finally;
+        }
+        else if(manager == -2)
+        {
+          err_msg = "unable to bind socket";
+          goto finally;
+        }
+        else if(manager == -3)
+        {
+          err_msg = "unable to listen";
+          goto finally;
+        }
+      }
+    }
 
     // registrar sigterm es útil para terminar el programa normalmente.
     // esto ayuda mucho en herramientas como valgrind.
@@ -308,7 +432,7 @@ int main(const int argc, char **argv) {
     const struct fd_handler manager_handler = {
         .handle_read       = manager_server_start,
         .handle_write      = NULL,
-        .handle_close      = NULL, 
+        .handle_close      = NULL,
     };
 
     ss = selector_register(selector, server, &socksv5, OP_READ, NULL);

@@ -6,7 +6,7 @@
 
 #include "hello.h"
 
-extern void 
+extern void
 hello_parser_init(struct hello_parser *p) {
     p->state     = hello_version;
     p->remaining = 0;
@@ -47,14 +47,14 @@ hello_parser_feed(struct hello_parser *p, const uint8_t b) {
             // nada que hacer, nos quedamos en este estado
             break;
         default:
-            fprintf(stderr, "unknown state %d\n", p->state);
+            fprintf(stderr, "Estado desconocido %d\n", p->state);
             abort();
     }
 
     return p->state;
 }
 
-extern bool 
+extern bool
 hello_is_done(const enum hello_state state, bool *errored) {
     bool ret;
     switch (state) {
@@ -78,7 +78,7 @@ hello_error(const struct hello_parser *p) {
     char *ret;
     switch (p->state) {
         case hello_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         default:
             ret = "";
@@ -87,7 +87,7 @@ hello_error(const struct hello_parser *p) {
     return ret;
 }
 
-extern void 
+extern void
 hello_parser_close(struct hello_parser *p) {
     /* no hay nada que liberar */
 }
@@ -118,4 +118,3 @@ hello_marshall(buffer *b, const uint8_t method) {
     buffer_write_adv(b, 2);
     return 2;
 }
-

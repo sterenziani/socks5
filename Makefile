@@ -28,7 +28,7 @@ $(EXECUTABLE): $(OBJECTS)
 	$(CC) -c -o $@.o $(CFLAGS) $(DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
 
-$(MANAGER):	$(MAN_OBJECTS)
+$(MANAGER): $(MAN_OBJECTS)
 	$(CC) -c -o $@.o $(CFLAGS) $(MAN_DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
 
@@ -36,6 +36,7 @@ $(MANAGER):	$(MAN_OBJECTS)
 doh-build:
 	$(DOCKER) pull nginx
 	$(DOCKER) build -t $(DOH_IMAGE) ./doh_server/
+
 
 .PHONY: doh-stop
 doh-stop:

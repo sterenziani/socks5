@@ -19,7 +19,7 @@
 
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 
-#define ERROR_DEFAULT_MSG "something failed"
+#define ERROR_DEFAULT_MSG "Algo falló"
 
 /** retorna una descripción humana del fallo */
 const char *
@@ -27,19 +27,19 @@ selector_error(const selector_status status) {
     const char *msg;
     switch(status) {
         case SELECTOR_SUCCESS:
-            msg = "Success";
+            msg = "Exitoso";
             break;
         case SELECTOR_ENOMEM:
-            msg = "Not enough memory";
+            msg = "No hay suficiente memoria";
             break;
         case SELECTOR_MAXFD:
-            msg = "Can't handle any more file descriptors";
+            msg = "No puede soportar más file descriptors";
             break;
         case SELECTOR_IARGS:
-            msg = "Illegal argument";
+            msg = "Argumento ilegal";
             break;
         case SELECTOR_IO:
-            msg = "I/O error";
+            msg = "Error de E/S";
             break;
         default:
             msg = ERROR_DEFAULT_MSG;
@@ -459,7 +459,7 @@ handle_iteration(fd_selector s) {
             if(FD_ISSET(item->fd, &s->slave_r)) {
                 if(OP_READ & item->interest) {
                     if(0 == item->handler->handle_read) {
-                        assert(("OP_READ arrived but no handler. bug!" == 0));
+                        assert(("OP_READ llegó pero no hay handler" == 0));
                     } else {
                         item->handler->handle_read(&key);
                     }
@@ -468,7 +468,7 @@ handle_iteration(fd_selector s) {
             if(FD_ISSET(i, &s->slave_w)) {
                 if(OP_WRITE & item->interest) {
                     if(0 == item->handler->handle_write) {
-                        assert(("OP_WRITE arrived but no handler. bug!" == 0));
+                        assert(("OP_WRITE llegó pero no hay handler" == 0));
                     } else {
                         item->handler->handle_write(&key);
                     }
@@ -552,7 +552,7 @@ selector_select(fd_selector s) {
                 for(int i = 0 ; i < s->max_fd; i++) {
                     if(FD_ISSET(i, &s->master_r)|| FD_ISSET(i, &s->master_w)) {
                         if(-1 == fcntl(i, F_GETFD, 0)) {
-                            fprintf(stderr, "Bad descriptor detected: %d\n", i);
+                            fprintf(stderr, "Se detectó un file descriptor malo: %d\n", i);
                         }
                     }
                 }
