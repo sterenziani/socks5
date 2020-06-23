@@ -6,7 +6,7 @@
 
 #include "hello.h"
 
-extern void 
+extern void
 hello_parser_init(struct hello_parser *p) {
     p->state     = hello_version;
     p->remaining = 0;
@@ -54,7 +54,7 @@ hello_parser_feed(struct hello_parser *p, const uint8_t b) {
     return p->state;
 }
 
-extern bool 
+extern bool
 hello_is_done(const enum hello_state state, bool *errored) {
     bool ret;
     switch (state) {
@@ -87,7 +87,7 @@ hello_error(const struct hello_parser *p) {
     return ret;
 }
 
-extern void 
+extern void
 hello_parser_close(struct hello_parser *p) {
     /* no hay nada que liberar */
 }
@@ -118,4 +118,3 @@ hello_marshall(buffer *b, const uint8_t method) {
     buffer_write_adv(b, 2);
     return 2;
 }
-

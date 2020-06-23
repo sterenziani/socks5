@@ -247,6 +247,7 @@ static void socks5_destroy(struct socks5* s) {
     }
     else if(s->references == 1)
     {
+        active_connections--;
         if(pool_size < max_pool)
         {
             s->next = pool;
@@ -292,6 +293,7 @@ void socksv5_passive_accept(struct selector_key *key) {
     socklen_t client_addr_len = sizeof(client_addr);
     struct socks5* state = NULL;
     const int client = accept(key->fd, (struct sockaddr*) &client_addr, &client_addr_len);
+    uint8_t resp[2];
     if(client == -1) {
         goto fail;
     }
@@ -314,6 +316,10 @@ void socksv5_passive_accept(struct selector_key *key) {
     }
     return;
 fail:
+    resp[0] = 0x05;
+    resp[1] = 0xFF;
+    recv(client, NULL, 25, 0);
+    send(client, resp, 2, MSG_DONTWAIT);
     if(client != -1) {
         close(client);
     }
@@ -1418,5 +1424,4 @@ static void socksv5_done(struct selector_key* key) {
         close(fds[i]);
       }
     }
-    active_connections--;
 }

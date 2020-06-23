@@ -7,7 +7,6 @@
 enum request_manager_server_state {
     request_server_version,
     request_server_command,
-    request_server_status,
     request_server_user,
     request_server_pass,
     request_server_size,
@@ -22,7 +21,7 @@ struct request_manager_server_parser {
    	uint8_t user[255];
     uint8_t pass[255];
 
-    uint8_t pool_size;
+    uint8_t clients_size[4];
 
    	uint8_t remaining;
     uint8_t pointer;

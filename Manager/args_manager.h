@@ -19,7 +19,7 @@ struct manager_args {
 
     union {
     	struct users new_user;
-    	int new_pool_size;
+    	int new_clients_size;
     } params;
 }; 
 

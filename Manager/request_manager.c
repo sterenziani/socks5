@@ -2,8 +2,9 @@
 #include <stdlib.h>
 
 #include "request_manager.h"
+#define PROTOCOL_VERSION 0x01
 
-extern void 
+extern void
 request_manager_parser_init(struct request_manager_parser *p) {
     p->state     = request_version;
     p->remaining    = 0x00;
@@ -16,8 +17,8 @@ extern enum request_manager_state
 request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
     switch(p->state) {
         case request_version:
-            if(0x05 == b) {
-                p->state = request_status;
+            if(PROTOCOL_VERSION == b) {
+                p->state = request_command;
             } else {
                 p->state = request_error_unsupported_version;
             }
@@ -25,6 +26,7 @@ request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
 
         case request_command:
             p->command = b;
+
             if(0x00 == b) {
                 p->state = request_status;
             }
@@ -92,6 +94,7 @@ request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
                 p->total_con[p->pointer] = b;
                 p->pointer ++;
             }
+            break;
 
         case request_active_con:
             if(p->remaining == 0) {
@@ -142,7 +145,7 @@ request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
     return p->state;
 }
 
-extern bool 
+extern bool
 request_manager_is_done(const enum request_manager_state state, bool *errored) {
     bool ret;
     switch (state) {
@@ -188,7 +191,7 @@ request_manager_error(const struct request_manager_parser *p) {
     return ret;
 }
 
-extern void 
+extern void
 request_manager_parser_close(struct request_manager_parser *p) {
 }
 
@@ -206,14 +209,14 @@ request_manager_consume(buffer *b, struct request_manager_parser *p, bool *error
 }
 
 extern int
-request_marshall_new_user(buffer *b, const uint8_t user[], const int user_len, 
+request_marshall_new_user(buffer *b, const uint8_t user[], const int user_len,
     const uint8_t password[], const int pass_len) {
     size_t n;
     uint8_t *buff = buffer_write_ptr(b, &n);
     if(n < 6) {
         return -1;
     }
-    buff[0] = 0x05;
+    buff[0] = PROTOCOL_VERSION;
 
     buff[1] = 0x00;
 
@@ -232,17 +235,21 @@ request_marshall_new_user(buffer *b, const uint8_t user[], const int user_len,
 }
 
 extern int
-request_marshall_change_pool(buffer *b, const uint8_t size) {
+request_marshall_change_clients(buffer *b, const uint8_t size[]) {
     size_t n;
+    unsigned int int_size = sizeof(unsigned int);
     uint8_t *buff = buffer_write_ptr(b, &n);
     if(n < 3) {
         return -1;
     }
-    buff[0] = 0x05;
+    buff[0] = PROTOCOL_VERSION;
     buff[1] = 0x03;
-    buff[2] = size;
-    buffer_write_adv(b, 3);
-    return 3;
+    buff[2] = int_size;
+    for(unsigned int i = 0; i<int_size; i++) {
+        buff[3 + i] = size[i];
+    }
+    buffer_write_adv(b, 3 + int_size);
+    return (3 + int_size);
 }
 
 extern int
@@ -252,8 +259,9 @@ request_marshall_get_info(buffer *b, const uint8_t command) {
     if(n < 2) {
         return -1;
     }
-    buff[0] = 0x05;
+    buff[0] = PROTOCOL_VERSION;
     buff[1] = command;
+
     buffer_write_adv(b, 2);
     return 2;
 }

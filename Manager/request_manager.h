@@ -64,7 +64,7 @@ request_marshall_new_user(buffer *b, const uint8_t user[], const int user_len,
     const uint8_t password[], const int pass_len);
 
 int
-request_marshall_change_pool(buffer *b, const uint8_t size);
+request_marshall_change_clients(buffer *b, const uint8_t size[]);
 
 int
 request_marshall_get_info(buffer *b, const uint8_t command);

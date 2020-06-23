@@ -9,6 +9,7 @@
 #include "selector.h"
 
 #define MAX_USERS 10
+#define MAX_CLIENTS 505
 
 void manager_server_start (struct  selector_key *key);
 
@@ -20,7 +21,6 @@ extern unsigned long transferred_bytes;
 extern unsigned int max_clients;
 extern bool disectors_enabled;
 extern unsigned int buffer_size;
-extern uint8_t pool_size;
-extern struct doh* doh;
+extern unsigned int max_clients;
 
 #endif
