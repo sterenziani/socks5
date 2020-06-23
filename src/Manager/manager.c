@@ -26,6 +26,7 @@
 #define SUCCESS 1
 #define ERROR -1
 
+  struct manager* manager;
 unsigned int buffer_size;
 struct manager_args* args;
 static bool done = false;
@@ -253,11 +254,12 @@ static int request_manager_read(struct manager* manager) {
 
 static void close_manager(int sock) {
     free(args);
+    free(manager);
     close(sock);
 }
 
 static void start_manager(int sock) {
-  struct manager* manager  = malloc(sizeof(*manager));
+  manager = malloc(sizeof(*manager));
   manager->socks_fd = sock;
   buffer_init(&manager->manager_read_buffer, N(manager->raw_buff_a), manager->raw_buff_a);
   buffer_init(&manager->manager_write_buffer, N(manager->raw_buff_b), manager->raw_buff_b);

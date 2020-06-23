@@ -176,7 +176,7 @@ finally:
 /** realmente destruye */
 static void socks5_destroy_(struct socks5* s) {
     if(s->origin_resolution != NULL) {
-        freedohinfo(s->origin_resolution);
+        (s->origin_resolved_by_doh)?freedohinfo(s->origin_resolution):freeaddrinfo(s->origin_resolution);
         s->origin_resolution = NULL;
     }
     free(s);
@@ -199,7 +199,7 @@ static void socks5_destroy(struct socks5* s) {
             s->next = pool;
             pool = s;
             pool_size++;
-            freedohinfo(s->origin_resolution);
+            (s->origin_resolved_by_doh)?freedohinfo(s->origin_resolution):freeaddrinfo(s->origin_resolution);
         }
         else
             socks5_destroy_(s);
