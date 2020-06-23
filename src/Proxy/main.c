@@ -213,7 +213,8 @@ static int create_ipv6_manager_socket(struct socks5args* args) {
 
 
 int main(const int argc, char **argv) {
-    setLogLevel(DEBUG);
+    // Change to DEBUG to see all logs
+    setLogLevel(INFO);
     total_connections = 0;
     active_connections = 0;
     transferred_bytes = 0;

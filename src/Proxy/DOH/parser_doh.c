@@ -110,21 +110,32 @@ parser_doh_init(void){
 void
 parser_doh_destroy(struct parser_doh *p) {
     if(p != NULL) {
+      if(p->parser_http != NULL)
+        parser_destroy(p->parser_http);
+      if(p->parser_crlf != NULL)
+        parser_destroy(p->parser_crlf);
+      if(p->parser_te != NULL)
+        parser_destroy(p->parser_te);
+      if(p->parser_ct != NULL)
+        parser_destroy(p->parser_ct);
+      if(p->parser_cl != NULL)
+        parser_destroy(p->parser_cl);
+      if(p->parser_num != NULL)
+        parser_destroy(p->parser_num);
 
-      parser_destroy(p->parser_http);
-      parser_destroy(p->parser_crlf);
-      parser_destroy(p->parser_te);
-      parser_destroy(p->parser_ct);
-      parser_destroy(p->parser_cl);
-      parser_destroy(p->parser_num);
+      if(p->parser_definition_te != NULL)
+        parser_utils_strcmpi_destroy(p->parser_definition_te);
+      if(p->parser_definition_ct != NULL)
+        parser_utils_strcmpi_destroy(p->parser_definition_ct);
+      if(p->parser_definition_cl != NULL)
+        parser_utils_strcmpi_destroy(p->parser_definition_cl);
 
-      parser_utils_strcmpi_destroy(p->parser_definition_te);
-      parser_utils_strcmpi_destroy(p->parser_definition_ct);
-      parser_utils_strcmpi_destroy(p->parser_definition_cl);
-
-      free(p->parser_definition_te);
-      free(p->parser_definition_ct);
-      free(p->parser_definition_cl);
+      if(p->parser_definition_te != NULL)
+        free(p->parser_definition_te);
+      if(p->parser_definition_ct != NULL)
+        free(p->parser_definition_ct);
+      if(p->parser_definition_cl != NULL)
+        free(p->parser_definition_cl);
 
       free(p);
     }

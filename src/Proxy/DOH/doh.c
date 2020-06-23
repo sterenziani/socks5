@@ -346,12 +346,11 @@ solveDomain(const struct doh* dohAddr, const char* host, const char* port, struc
         aux2->ai_next = ret2;
       }
     }
+    parser_doh_destroy(myDohParser);
   }
-
 
   shutdown(sockfd, SHUT_RDWR);
   close(sockfd);
-  //parser_doh_destroy(myDohParser);
 	return err;
 }
 
