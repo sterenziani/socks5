@@ -18,7 +18,7 @@ int main()
 		{
 			char str1[4096];
 			sprintf(str1, "ncat -C -c \"while true; do echo \\\"GET / HTTP/1.1\r\n\r\n\\\"; sleep 5; done;\" "
-				"--proxy 127.0.0.1:1080 --proxy-auth juan:juan --proxy-type socks5 www.google.com 80", i);
+				"--proxy 127.0.0.1:1080 --proxy-auth juan:juan --proxy-type socks5 www.google.com 80");
     		int ret = system(str1);
     		return ret;
 		}
