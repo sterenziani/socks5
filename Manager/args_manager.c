@@ -7,6 +7,7 @@
 #include <stdbool.h>
 
 #include "args_manager.h"
+#define VERSION "1.0"
 
 static unsigned short
 port(const char *s) {
@@ -40,8 +41,8 @@ user(char *s, struct users *user) {
 
 static void
 version(void) {
-  fprintf(stderr, "ManagerSocksv5 version 1.0\n"
-                  "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
+    fprintf(stderr, "socksv5 version version %s\n"
+                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n", VERSION);
 }
 
 static void
@@ -56,7 +57,7 @@ usage(const char *progname) {
         "   -a <name>:<pass> Agregar un usuario y contraseña.\n"
         "   -m               Obtener métricas sobre el funcionamiento del servidor.\n"
         "   -U               Listar usuarios del proxy.\n"
-        "   -s <new size>    Cambiar cantidad máxima de clientes concurrentes. Máximo 505 clientes.\n"
+        "   -s <new size>    Cambiar cantidad máxima de usuarios concurrentes. Máximo 505 clientes.\n"
         "   -v               Imprime información sobre la versión y termina.\n"
         ,
         progname);
@@ -151,7 +152,7 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
 
     }
     if (optind < argc) {
-        fprintf(stderr, "Argumento no aceptadp: ");
+        fprintf(stderr, "Argumento no aceptado: ");
         while (optind < argc) {
             fprintf(stderr, "%s ", argv[optind++]);
         }

@@ -2,13 +2,13 @@
  * socks5nio.c  - controla el flujo de un proxy SOCKSv5 (sockets no bloqueantes)
  */
 #include <stdio.h>
-#include <stdlib.h>  // malloc
-#include <string.h>  // memset
-#include <assert.h>  // assert
+#include <stdlib.h>
+#include <string.h>
+#include <assert.h>
 #include <errno.h>
 #include <time.h>
 #include <sys/socket.h>
-#include <unistd.h>  // close
+#include <unistd.h>
 #include <pthread.h>
 #include <arpa/inet.h>
 #include <netinet/in.h>
@@ -22,6 +22,8 @@
 #include "passwords.h"
 #include "base64.h"
 #include "DOH/doh.h"
+#include "timestamp.h"
+#include "logger.h"
 #define N(x) (sizeof(x)/sizeof((x)[0]))
 #define MAX_BUFFER_SIZE 4096
 #define MIN_BUFFER_SIZE 64
@@ -30,64 +32,14 @@ static const struct state_definition* get_states();
 
 /** maquina de estados general */
 enum socks_v5state {
-    /**
-     * recibe el mensaje `hello` del cliente, y lo procesa
-     *
-     * Intereses:
-     *     - OP_READ sobre client_fd
-     *
-     * Transiciones:
-     *   - HELLO_READ  mientras el mensaje no esté completo
-     *   - HELLO_WRITE cuando está completo
-     *   - ERROR       ante cualquier error (IO/parseo)
-     */
-    HELLO_READ,
-
-    /**
-     * envía la respuesta del `hello' al cliente.
-     *
-     * Intereses:
-     *     - OP_WRITE sobre client_fd
-     *
-     * Transiciones:
-     *   - HELLO_WRITE  mientras queden bytes por enviar
-     *   - REQUEST_READ cuando se enviaron todos los bytes
-     *   - ERROR        ante cualquier error (IO/parseo)
-     */
-    HELLO_WRITE,
-
-        /**
-     * recibe el mensaje request del cliente, y lo procesa
-     *
-     * Intereses:
-     *     - OP_READ sobre client_fd
-     *
-     * Transiciones:
-     *   - REQUEST_READ  mientras el mensaje no esté completo
-     *   - REQUEST_WRITE cuando está completo
-     *   - ERROR       ante cualquier error (IO/parseo)
-     */
-
-    AUTH_READ,
-    AUTH_WRITE,
-    REQUEST_READ,
-    REQUEST_RESOLVE,
-
-    /**
-     * envía la respuesta del request al cliente.
-     *
-     * Intereses:
-     *     - OP_WRITE sobre client_fd
-     *
-     * Transiciones:
-     *   - RESPONSE_WRITE  mientras queden bytes por enviar
-     *   - DONE cuando se enviaron todos los bytes
-     *   - ERROR        ante cualquier error (IO/parseo)
-     */
-    REQUEST_WRITE,
-
-
-    COPY,
+    HELLO_READ,         // Lee y procesa el saludo inicial del cliente
+    HELLO_WRITE,        // Envía una respuesta acorde basado en lo que recibió
+    AUTH_READ,          // Lee los datos de autenticación del cliente
+    AUTH_WRITE,         // Reponde a la autenticación del cliente
+    REQUEST_READ,       // Lee y procesa el pedido de conexión a un server
+    REQUEST_RESOLVE,    // Resuelve el nombre de un dominio
+    REQUEST_WRITE,      // Responde al pedido de conexión de un cliente
+    COPY,               // Transfiere bytes de un host a otro y busca contraseñas
 
     // estados terminales
     DONE,
@@ -107,13 +59,11 @@ struct hello_st {
 };
 
 struct auth_st {
-    /** buffer utilizado para I/O */
     buffer               *rb, *wb;
     struct auth_parser   parser;
 };
 
 struct request_st {
-    /** buffer utilizado para I/O */
     buffer               *rb, *wb;
     struct request_parser  parser;
 };
@@ -121,8 +71,6 @@ struct request_st {
 struct copy_st {
   buffer               *rb, *wb;
 };
-
-//...
 
 /*
  * Si bien cada estado tiene su propio struct que le da un alcance
@@ -133,8 +81,6 @@ struct copy_st {
  * liberarlo finalmente, y un pool para reusar alocaciones previas.
  */
 struct socks5 {
-    //...
-    /** maquinas de estados */
     struct state_machine          stm;
 
     /** estados para el client_fd */
@@ -191,7 +137,7 @@ static struct socks5* socks5_new(int fd)
 {
   if(active_connections >= max_clients)
   {
-    fprintf(stdout, "Connection rejected. Maximum client capacity surpassed.\n");
+    log(DEBUG, "Conexión rechazada. Se superó el límite de clientes %d.\n", max_clients);
     return NULL;
   }
   struct socks5* ret;
@@ -302,9 +248,6 @@ void socksv5_passive_accept(struct selector_key *key) {
     }
     state = socks5_new(client);
     if(state == NULL) {
-        // sin un estado, nos es imposible manejaro.
-        // tal vez deberiamos apagar accept() hasta que detectemos
-        // que se liberó alguna conexión.
         goto fail;
     }
     active_connections++;
@@ -596,7 +539,7 @@ static unsigned request_write(struct selector_key *key) {
 static void * request_resolve(void *data){
     struct selector_key *key = (struct selector_key *) data;
     struct socks5* sock = ATTACHMENT(key);
-    // Liberá todos los recursos cuando termines el thread
+    // Libera todos los recursos cuando termine el thread
     pthread_detach(pthread_self());
     sock->origin_resolution = 0;
     struct addrinfo hints = {
@@ -637,7 +580,7 @@ static void * request_resolve(void *data){
     // Plan C = Use getaddrinfo
     if(sock->origin_resolution == NULL)
     {
-      fprintf(stdout,"Dominio \"%s\" no pudo ser resuelto por DoH, usando getaddrinfo\n",sock->origin_addr);
+      log(DEBUG, "\"%s\" no pudo ser resuelto por DoH. Usando getaddrinfo", sock->origin_addr);
       sock->origin_resolved_by_doh = 0;
       getaddrinfo(sock->origin_addr, buff, &hints, &sock->origin_resolution);
 
@@ -654,18 +597,6 @@ static void * request_resolve(void *data){
     selector_notify_block(key->s, key->fd);
     free(data);
     return 0;
-}
-
-char* time_stamp()
-{
-  char *timestamp = (char *)malloc(sizeof(char) * 22);
-  time_t ltime;
-  ltime=time(NULL);
-  struct tm *tm;
-  tm=localtime(&ltime);
-
-  sprintf(timestamp,"%04d-%02d-%02dT%02d:%02d:%02dZ", tm->tm_year+1900, tm->tm_mon, tm->tm_mday, tm->tm_hour, tm->tm_min, tm->tm_sec);
-  return timestamp;
 }
 
 void initialize_communication_parser(struct socks5* sock)
@@ -729,11 +660,6 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
                 if(SELECTOR_SUCCESS != st) {
                   return ERROR;
                 }
-              }
-            }else{
-              st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
-              if(SELECTOR_SUCCESS != st) {
-                return ERROR;
               }
             }
             sock->references++;
@@ -815,11 +741,6 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
                 return ERROR;
               }
             }
-          }else{
-            st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
-            if(SELECTOR_SUCCESS != st) {
-              return ERROR;
-            }
           }
           sock->references++;
           sock->origin_port = ntohs(address.sin6_port);
@@ -900,10 +821,10 @@ static void request_resolve_init(const unsigned state, struct selector_key *key)
 
   memcpy(sock->origin_addr, d->parser.address, &(d->parser.addr_ptr)-(d->parser.address));
   pthread_t tid;
-  // En otro thread, resolvé el nombre
+  // En otro thread, resuelve el nombre
   if (-1 == pthread_create(&tid, 0, request_resolve, dns_key))
   {
-    fprintf(stdout, "Error when creating new thread!\n");
+    log(DEBUG, "%s", "Ocurrió un error al crear un nuevo hilo");
     selector_unregister_fd(key->s, sock->client_fd);
     free(dns_key);
     abort();
@@ -1070,7 +991,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
   return REQUEST_WRITE;
 
   finally:
-    fprintf(stdout, "Error. Couldn't connect %d to their requested origin server\n", sock->client_fd);
     freedohinfo(sock->origin_resolution);
     sock->origin_resolution = 0;
     return ERROR;
@@ -1224,7 +1144,6 @@ static unsigned copy_read(struct selector_key *key) {
         ptr = buffer_write_ptr(d_orig->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
-          //fprintf(stdout, "Connection with origin server %d lost\n", key->fd);
           shutdown(sock->origin_fd, SHUT_RD);
           shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
@@ -1244,7 +1163,6 @@ static unsigned copy_read(struct selector_key *key) {
         ptr = buffer_write_ptr(d_cli->rb, &count);
         n = recv(key->fd, ptr, count, 0);
         if(n <= 0){
-          //fprintf(stdout, "Connection with client %d lost\n", key->fd);
           shutdown(sock->origin_fd, SHUT_RD);
           shutdown(sock->client_fd, SHUT_RD);
           return ERROR;
@@ -1262,7 +1180,7 @@ static unsigned copy_read(struct selector_key *key) {
       }
       else
       {
-        fprintf(stdout, "Unexpected fd: %d\n", key->fd);
+        log(DEBUG, "File descriptos inesperado: %d", key->fd);
         abort();
       }
 
@@ -1285,14 +1203,12 @@ static unsigned copy_write(struct selector_key *key) {
         ret = copy_paste_buffer(d_cli->rb, d_orig->wb, n);
         if(ret == COPY)
         {
-          // count = cuanto tengo para enviar
           ptr = buffer_read_ptr(d_orig->wb, &count);
           if(send(sock->origin_fd, ptr, count, MSG_DONTWAIT) < 0)
             ret = ERROR;
           else
           {
             buffer_read_adv(d_orig->wb, count);
-            //fprintf(stdout, "Sent %d -> %d\n", sock->client_fd, sock->origin_fd);
             transferred_bytes += count;
             buffer_compact(d_orig->wb);
           }
@@ -1310,7 +1226,6 @@ static unsigned copy_write(struct selector_key *key) {
           else
           {
             buffer_read_adv(d_cli->wb, count);
-            //fprintf(stdout, "Sent %d <- %d\n", sock->client_fd, sock->origin_fd);
             transferred_bytes += count;
             buffer_compact(d_cli->wb);
           }

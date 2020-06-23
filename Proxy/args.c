@@ -7,6 +7,7 @@
 
 #include "args.h"
 #include "DOH/doh.h"
+#define VERSION "1.0"
 
 static unsigned short
 port(const char *s) {
@@ -40,8 +41,8 @@ user(char *s, struct users *user) {
 
 static void
 version(void) {
-    fprintf(stderr, "socksv5 version 1.0\n"
-                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
+    fprintf(stderr, "socksv5 version %s\n"
+                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n", VERSION);
 }
 
 static void
