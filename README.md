@@ -1,21 +1,40 @@
 # SOCKS5 Proxy Server
 
 Servidor proxy SOCKS5 en C.
-Es requisito tener las variables de entorno CC y DOCKER.
+
+### Prerequisitos
+Es requisito tener docker o similar instalado y definir las variables de entorno CC y DOCKER.
+
 Ejemplos para dichos valores son:
+```
 export CC=gcc
 export DOCKER=docker
 
+```
+## Instrucciones de Instalación
+Asegurar de cumplir los Prerequisitos.
+
+```
+git clone git@bitbucket.org:itba/pc-2020a-2.git
+cd pc2020a-2.git
+make all
+./main
+```
+
 ## Instrucciones para el Makefile
 
-all: compila y linkedita el ejecutable main. No corre el servidor doh, hace falta correrlo por separado
+*all: compila y linkedita el ejecutable main y el ejecutable manager. No corre el servidor doh, hace falta correrlo por separado.
 
-doh-build: descarga el contenedor nginx y arma la imagen doh-nginx. Usar solamente al principio
+*main: compila y linkedita el ejecutable main, el servidor proxy socksv5.
 
-doh-start: Corre el contenedor doh-server desde la imagen doh-nginx.
+*manager: compila y linkedita el ejecutable manager, el cliente que maneja el admin.
 
-doh-stop: Frena la ejecución del doh-server. No hace nada si dicho contenedor no esta corriendo.
+*doh-build: descarga el contenedor nginx y arma la imagen doh-nginx. Usar solamente al principio.
 
-tests: corre los tests presentes en la carpeta Tests
+*doh-start: Corre el contenedor doh-server desde la imagen doh-nginx.
 
-clean: borra todos los archivos ejecutables y temporales
+*doh-stop: Frena la ejecución del doh-server. No hace nada si dicho contenedor no esta corriendo.
+
+*tests: corre los tests presentes en la carpeta Tests.
+
+*clean: borra todos los archivos ejecutables y temporales.
