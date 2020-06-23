@@ -694,19 +694,30 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
             address.sin_port = htons(p);
             memcpy(&sock->origin_addr_storage, (struct sockaddr*) &address, INET_ADDRSTRLEN);
 
-            if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) == -1){
-              if(errno == EINPROGRESS) {
-                selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
-                if(SELECTOR_SUCCESS != st) {
-                  return ERROR;
-                }
+            selector_status st;
+            if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS){
+              d->parser.error = request_connection_fail;
+            }else if(errno == EINPROGRESS) {
+              st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+              if(SELECTOR_SUCCESS != st) {
+                return ERROR;
+              }
+              int option = 0;
+              socklen_t optionLen = sizeof(option);
+
+              if(getsockopt(sock->origin_fd, SOL_SOCKET, SO_ERROR, &option, &optionLen) == -1 || option != 0){
+                d->parser.error = request_connection_fail;
+              }else{
                 st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
                 if(SELECTOR_SUCCESS != st) {
                   return ERROR;
                 }
               }
-              else
-                d->parser.error = request_connection_fail;
+            }else{
+              st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
+              if(SELECTOR_SUCCESS != st) {
+                return ERROR;
+              }
             }
             sock->references++;
             sock->origin_port = ntohs(address.sin_port);
@@ -757,19 +768,30 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
           address.sin6_port = htons(p);
           memcpy(&sock->origin_addr_storage, (struct sockaddr*) &address, INET6_ADDRSTRLEN);
 
-          if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) == -1){
-            if(errno == EINPROGRESS) {
-              selector_status st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
-              if(SELECTOR_SUCCESS != st) {
-                return ERROR;
-              }
+          selector_status st;
+          if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS){
+            d->parser.error = request_connection_fail;
+          }else if(errno == EINPROGRESS) {
+            st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
+            if(SELECTOR_SUCCESS != st) {
+              return ERROR;
+            }
+            int option = 0;
+            socklen_t optionLen = sizeof(option);
+
+            if(getsockopt(sock->origin_fd, SOL_SOCKET, SO_ERROR, &option, &optionLen) == -1 || option != 0){
+              d->parser.error = request_connection_fail;
+            }else{
               st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
               if(SELECTOR_SUCCESS != st) {
                 return ERROR;
               }
             }
-            else
-              d->parser.error = request_connection_fail;
+          }else{
+            st = selector_register(key->s, sock->origin_fd, &socks5_handler, OP_WRITE, sock);
+            if(SELECTOR_SUCCESS != st) {
+              return ERROR;
+            }
           }
           sock->references++;
           sock->origin_port = ntohs(address.sin6_port);
