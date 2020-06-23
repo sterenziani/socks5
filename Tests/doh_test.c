@@ -33,7 +33,7 @@ void test_unspec(void);
 int main(int argc, char *argv[])
 {
   test_ipv4();
-  test_ipv6();
+  //test_ipv6();
   test_unspec();
   return 0;
 }

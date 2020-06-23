@@ -4,9 +4,9 @@
 #include <string.h>
 #include <sys/types.h>
 #include <unistd.h>
-#include <sys/wait.h>
+#include<sys/wait.h>
 
-#define CLIENTS 2000
+#define CLIENTS 5
 
 int main()
 {
@@ -17,8 +17,8 @@ int main()
 		if (pid == 0)
 		{
 			char str1[4096];
-
-    		sprintf(str1, "time curl --output downloaded-file-%d.bin -U juan:juan -x socks5://127.0.0.1:1080 https://speed.hetzner.de/100MB.bin -s > Tests/time.log", i);
+			
+    		sprintf(str1, "curl --output downloaded-file-%d.bin -U juan:juan -x socks5://127.0.0.1:1080 https://speed.hetzner.de/100MB.bin", i);
     		int ret = system(str1);
     		return ret;
 		}
@@ -27,11 +27,10 @@ int main()
 	}
 	for(int i=0; i < CLIENTS; i++)
 	{
-		waitpid(pids[i], 0, WUNTRACED);
+		wait(NULL);
 	}
-	printf("Se han descargado %d imagenes. Tiene 10 segundos para verlas antes de que se auto-destruyan!\n", CLIENTS);
+	printf("Se han descargado %d archivos. Tiene 10 segundos para verlos antes de que se auto-destruyan!\n", CLIENTS);
 	sleep(10);
-	system("rm *.jpg");
 	system("rm *.bin");
 	return 0;
 }

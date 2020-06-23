@@ -44,11 +44,23 @@ void register_users(struct users* users, char* registered_users[MAX_USERS][2])
     if(users[i].name != NULL && users[i].pass != NULL)
     {
       registered_users[i][0] = malloc(256*sizeof(char));
-      memset (registered_users[i][0], 0, 256);
+      memset(registered_users[i][0], 0, 256);
       memcpy(registered_users[i][0], users[i].name, strlen(users[i].name));
       registered_users[i][1] = malloc(256*sizeof(char));
-      memset (registered_users[i][1], 0, 256);
+      memset(registered_users[i][1], 0, 256);
       memcpy(registered_users[i][1], users[i].pass, strlen(users[i].pass));
+    }
+  }
+}
+
+void destroy_users(char* registered_users[MAX_USERS][2])
+{
+  for(int i=0; i < MAX_USERS; i++)
+  {
+    if(registered_users[i][0] != NULL && registered_users[i][1] != NULL)
+    {
+      free(registered_users[i][0]);
+      free(registered_users[i][1]);
     }
   }
 }
@@ -470,6 +482,7 @@ int main(const int argc, char **argv) {
         }
     }
     free(args);
+    destroy_users(registered_users);
     if(err_msg == NULL) {
         err_msg = "closing";
     }

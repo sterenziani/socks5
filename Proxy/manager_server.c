@@ -291,8 +291,10 @@ static void request_manager_server_process(struct request_manager_server_st* d, 
 		    	}
 
 		    	registered_users[i][0] = malloc(256*sizeof(char));
+					memset(registered_users[i][0], 0, 256);
 		    	memcpy(registered_users[i][0], d->parser.user, strlen((char *) d->parser.user));
 		    	registered_users[i][1] = malloc(256*sizeof(char));
+					memset(registered_users[i][1], 0, 256);
 		    	memcpy(registered_users[i][1], d->parser.pass, strlen((char *) d->parser.pass));
 		    	request_marshall_change(buff, 0x00, 0x00);
 
@@ -443,6 +445,7 @@ static void manager_server_block(struct selector_key *key) {
 }
 
 static void manager_server_close(struct selector_key *key) {
+	free(ATTACHMENT(key));
 }
 
 static void manager_server_done(struct selector_key* key) {
@@ -460,4 +463,3 @@ static void manager_server_done(struct selector_key* key) {
       }
     }
 }
-

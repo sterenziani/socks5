@@ -12,7 +12,7 @@ TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
 DEPS=$(wildcard $(DIR)/*.h) $(wildcard $(DOH_DIR)/*.h)
 OBJECTS=$(DEPS:.h=.o)
-TEST_FILTER_OUT=$(DIR)/socks5.o $(DIR)/auth.o
+TEST_FILTER_OUT=$(DIR)/socks5.o $(DIR)/auth.o $(DIR)/manager_server.o
 EXECUTABLE=main
 MANAGER=manager
 
