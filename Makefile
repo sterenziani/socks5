@@ -6,6 +6,7 @@
 CFLAGS=-pthread -g --std=c11 -pedantic -pedantic-errors -Wall -Wextra -Werror -Wno-unused-parameter -Wno-unused-variable -Wno-implicit-fallthrough -D_POSIX_C_SOURCE=200112L
 DIR=Proxy
 MAN_DIR=Manager
+MAN_OBJECTS=$(wildcard $(MAN_DIR)/*.o) $(DIR)/selector.o $(DIR)/buffer.o $(DIR)/stm.o $(DIR)/auth.o
 DOH_DIR=$(DIR)/DOH
 TEST_DIR=Tests
 TEST_C=$(wildcard $(TEST_DIR)/*.c)
@@ -13,6 +14,7 @@ DEPS=$(wildcard $(DIR)/*.h) $(wildcard $(DOH_DIR)/*.h)
 OBJECTS=$(DEPS:.h=.o)
 TEST_FILTER_OUT=$(DIR)/socks5.o $(DIR)/auth.o
 EXECUTABLE=main
+MANAGER=manager
 
 # Variables para doh Server
 DOH_PORT=8053
@@ -20,12 +22,15 @@ DOH_IMAGE=doh-nginx
 DOH_CONTAINER=doh-server
 
 .PHONY: all
-all: $(EXECUTABLE)
+all: $(EXECUTABLE) $(MANAGER)
 
-$(EXECUTABLE): $(OBJECTS) 
+$(EXECUTABLE): $(OBJECTS)
 	$(CC) -c -o $@.o $(CFLAGS) $(DIR)/$@.c
 	$(CC) -o $@ $^ $@.o $(CFLAGS)
-	$(CC) $(CFLAGS) Proxy/selector.c Proxy/buffer.c Proxy/stm.c Manager/*.c Proxy/auth.h
+
+$(MANAGER):	$(OBJECTS)
+	$(CC) -c -o $@.o $(CFLAGS) $(MAN_DIR)/$@.c
+	$(CC) -o $@ $^ $@.o $(CFLAGS)
 
 .PHONY: doh-build
 doh-build:
@@ -56,6 +61,3 @@ tests: $(subst .c,,$(TEST_C))
 .PHONY: clean
 clean:
 	rm -rf $(EXECUTABLE) $(EXECUTABLE).o $(OBJECTS) $(TEST_DIR)/*.o $(TEST_DIR)/*_test manager manager.o $(MAN_DIR)/*.o a.out
-
-
-
