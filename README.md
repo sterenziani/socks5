@@ -11,7 +11,7 @@ export CC=gcc
 export DOCKER=docker
 
 ```
-## Instrucciones de Instalación
+## Instrucciones de Instalación: proxy
 Asegurar de cumplir los Prerequisitos.
 
 ```
@@ -19,6 +19,13 @@ git clone git@bitbucket.org:itba/pc-2020a-2.git
 cd pc2020a-2.git
 make all
 ./main
+```
+
+### Instrucciones de Instalación: doh server
+Una vez instalada la imagen de del doh server solo hace falta correr doh-start
+```
+make doh-build
+make doh-start
 ```
 
 ## Instrucciones para el Makefile
