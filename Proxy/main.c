@@ -1,15 +1,3 @@
-/**
- * main.c - servidor proxy socks concurrente
- *
- * Interpreta los argumentos de línea de comandos, y monta un socket
- * pasivo.
- *
- * Todas las conexiones entrantes se manejarán en éste hilo.
- *
- * Se descargará en otro hilos las operaciones bloqueantes (resolución de
- * DNS utilizando getaddrinfo), pero toda esa complejidad está oculta en
- * el selector.
- */
 #include <stdio.h>
 #include <string.h>
 #include <stdlib.h>
@@ -27,6 +15,7 @@
 #include "manager_server.h"
 #include "selector.h"
 #include "args.h"
+#include "logger.h"
 
 #define MAX_CONNECTIONS 1024
 
@@ -43,7 +32,6 @@ struct doh* doh;
 static bool done = false;
 
 static void sigterm_handler(const int signal) {
-    printf("signal %d, cleaning up and exiting\n",signal);
     done = true;
 }
 
@@ -56,8 +44,10 @@ void register_users(struct users* users, char* registered_users[MAX_USERS][2])
     if(users[i].name != NULL && users[i].pass != NULL)
     {
       registered_users[i][0] = malloc(256*sizeof(char));
+      memset (registered_users[i][0], 0, 256);
       memcpy(registered_users[i][0], users[i].name, strlen(users[i].name));
       registered_users[i][1] = malloc(256*sizeof(char));
+      memset (registered_users[i][1], 0, 256);
       memcpy(registered_users[i][1], users[i].pass, strlen(users[i].pass));
     }
   }
@@ -75,7 +65,7 @@ int create_ipv4_socket(struct socks5args* args)
   if(server < 0) {
       return -1;
   }
-  fprintf(stdout, "Listening on IPv4 TCP port %d\n", args->socks_port);
+  log(DEBUG, "Esperando clientes en %s:%d (TCP)", args->socks_addr, args->socks_port);
   setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
   if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
       return -2;
@@ -93,9 +83,15 @@ int create_ipv6_socket(struct socks5args* args)
   addr.sin6_family = AF_INET6;
 
   if(strcmp(args->socks_addr, "0.0.0.0") != 0)
+  {
     inet_pton(AF_INET6, args->socks_addr, &addr.sin6_addr.s6_addr);
+    log(DEBUG, "Esperando clientes en [%s]:%d (TCP)", args->socks_addr, args->socks_port);
+  }
   else
+  {
     inet_pton(AF_INET6, "::", &addr.sin6_addr.s6_addr);
+    log(DEBUG, "Esperando clientes en [%s]:%d (TCP)", "::", args->socks_port);
+  }
   addr.sin6_port = htons(args->socks_port);
 
   int server = socket(AF_INET6, SOCK_STREAM, IPPROTO_TCP);
@@ -104,7 +100,6 @@ int create_ipv6_socket(struct socks5args* args)
   }
   setsockopt(server, SOL_SOCKET, SO_REUSEADDR, &(int){ 1 }, sizeof(int));
   setsockopt(server, IPPROTO_IPV6, IPV6_V6ONLY, &(int){ 1 }, sizeof(int));
-  fprintf(stdout, "Listening on IPv6 TCP port %d\n", args->socks_port);
   if(bind(server, (struct sockaddr*) &addr, sizeof(addr)) < 0) {
       return -2;
   }
@@ -150,7 +145,7 @@ static int create_ipv4_manager_socket(struct socks5args* args) {
     return -3;
   }
 
-  fprintf(stdout, "Escuchando a admin en puerto %d IPv4", args->mng_port);
+  log(DEBUG, "Esperando administradores en %s:%d (TCP)", args->mng_addr, args->mng_port);
   return mng_fd;
 }
 
@@ -164,9 +159,15 @@ static int create_ipv6_manager_socket(struct socks5args* args) {
   addr.sin6_family = AF_INET6;
 
   if(strcmp(args->mng_addr, "0.0.0.0") != 0)
+  {
     inet_pton(AF_INET6, args->mng_addr, &addr.sin6_addr.s6_addr);
+    log(DEBUG, "Esperando administradores en [%s]:%d (TCP)", args->mng_addr, args->mng_port);
+  }
   else
+  {
     inet_pton(AF_INET6, "::", &addr.sin6_addr.s6_addr);
+    log(DEBUG, "Esperando administradores en [%s]:%d (TCP)", "::", args->mng_port);
+  }
   addr.sin6_port = htons(args->mng_port);
 
   int mng_fd = socket(AF_INET6, SOCK_STREAM, IPPROTO_SCTP);
@@ -195,12 +196,12 @@ static int create_ipv6_manager_socket(struct socks5args* args) {
     return -3;
   }
 
-  fprintf(stdout, "Escuchando a admin en puerto %d IPv6", args->mng_port);
   return mng_fd;
 }
 
 
 int main(const int argc, char **argv) {
+    setLogLevel(DEBUG);
     total_connections = 0;
     active_connections = 0;
     transferred_bytes = 0;
@@ -209,8 +210,6 @@ int main(const int argc, char **argv) {
 
     struct socks5args* args = malloc(sizeof(struct socks5args));
     parse_args(argc, argv, args);
-    fprintf(stdout, "El manager está en %s:%d\n", args->mng_addr, args->mng_port);
-    fprintf(stdout, "El DoH está en %s:%d y es el host %s\n", args->doh.ip, args->doh.port, args->doh.host);
 
     register_users(args->users, registered_users);
     disectors_enabled = args->disectors_enabled;
@@ -449,6 +448,13 @@ int main(const int argc, char **argv) {
     }
 
     ss = selector_register(selector, manager, &manager_handler, OP_READ, NULL);
+    if(ss != SELECTOR_SUCCESS) {
+        err_msg = "registering fd";
+        goto finally;
+    }
+
+    if(manager2 > 0)
+      ss = selector_register(selector, manager2, &manager_handler, OP_READ, NULL);
     if(ss != SELECTOR_SUCCESS) {
         err_msg = "registering fd";
         goto finally;
