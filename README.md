@@ -2,6 +2,12 @@
 
 Servidor proxy SOCKS5 en C.
 
+### Documentación
+Toda la documentación adjuntada se encuentra disponible dentro del directorio docs.
+
+### Código Fuente
+Toda el código fuente se encuentra disponible dentro del directorio src.
+
 ### Prerequisitos
 Es requisito tener docker o similar instalado y definir las variables de entorno CC y DOCKER.
 
@@ -17,8 +23,8 @@ Asegurar de cumplir los Prerequisitos.
 ```
 git clone git@bitbucket.org:itba/pc-2020a-2.git
 cd pc2020a-2.git
+cd src
 make all
-./main
 ```
 
 ### Instrucciones de Instalación: doh server
@@ -45,3 +51,17 @@ make doh-start
 * tests: corre los tests presentes en la carpeta Tests.
 
 * clean: borra todos los archivos ejecutables y temporales.
+
+## Instrucciones de Ejecución: proxy
+Una vez hecho el make, buscar el ejecutable main dentro de la carpeta src y ejecutarlo. Se puede usar el flag -h para listar los argumentos que puede recibir
+
+```
+./main -h
+```
+
+## Instrucciones de Ejecución: manager
+Una vez hecho el make, buscar el ejecutable manager dentro de la carpeta src y ejecutarlo. Se puede usar el flag -h para listar los argumentos que puede recibir
+
+```
+./manager -h
+```

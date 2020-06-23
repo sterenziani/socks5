@@ -364,12 +364,10 @@ static unsigned hello_process(const struct hello_st* d) {
 
     uint8_t m = d->method;
     uint8_t r;
-    if(m == SOCKS_HELLO_NO_ACCEPTABLE_METHODS)
-      r = METHOD_NO_ACCEPTABLE_METHODS;
-    else if(m == SOCKS_HELLO_USER_PASS_AUTHENTICATION)
+    if(m == SOCKS_HELLO_USER_PASS_AUTHENTICATION)
       r = METHOD_USER_PASS_AUTHENTICATION;
     else
-      r = METHOD_NO_AUTHENTICATION_REQUIRED;
+      r = METHOD_NO_ACCEPTABLE_METHODS;
 
     if (-1 == hello_marshall(d->wb, r)) {
         ret  = ERROR;
