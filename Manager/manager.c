@@ -158,7 +158,7 @@ static int request_manager_write(struct manager* manager) {
     }
 
     else {
-      fprintf(stdout, "Comando invalido");
+      fprintf(stdout, "Comando inválido");
       return ERROR;
     }
 
@@ -194,7 +194,7 @@ static void request_manager_process(struct request_manager_st* d, bool error) {
   }
 
   else if(args->command == 0x02) {
-    fprintf(stdout, "Conexiones historicas:   %ld\n"
+    fprintf(stdout, "Conexiones históricas:   %ld\n"
     "Conexiones concurrentes:   %d\n"
     "Bytes transferidos:    %ld\n", *((unsigned long*)(void*) d->parser.total_con), *((unsigned int*)(void*) d->parser.active_con),
      *((unsigned long*)(void*) d->parser.bytes));
@@ -202,7 +202,7 @@ static void request_manager_process(struct request_manager_st* d, bool error) {
 
   else if(args->command == 0x03) {
     if(error) {
-      fprintf(stdout, "No pudieron realizarse los cambios pedidos\n");
+      fprintf(stdout, "No pudieron realizarse los cambios solicitados\n");
     }
     else {
       fprintf(stdout, "Nueva cantidad máxima de clientes simultáneos: %d\n", args->params.new_clients_size);

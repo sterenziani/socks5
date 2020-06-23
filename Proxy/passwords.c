@@ -96,7 +96,7 @@ enum http_parser_state http_parser_feed (struct http_parser *p, uint8_t b){
     case http_done:
     case http_no_user:              break;
 
-    default:                        fprintf(stderr, "unknown state %d\n", p->state);
+    default:                        fprintf(stderr, "Estado desconocido %d\n", p->state);
                                     abort();
   }
   return p->state;
@@ -487,6 +487,8 @@ enum pop3_parser_state pop3_parser_feed (struct pop3_parser *p, uint8_t b){
     case pop3_user_success:
     case pop3_auth_success:
     case pop3_error:            break;
+    default:                        fprintf(stderr, "Estado desconocido %d\n", p->state);
+                                    abort();
   }
   return p->state;
 }

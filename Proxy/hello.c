@@ -47,7 +47,7 @@ hello_parser_feed(struct hello_parser *p, const uint8_t b) {
             // nada que hacer, nos quedamos en este estado
             break;
         default:
-            fprintf(stderr, "unknown state %d\n", p->state);
+            fprintf(stderr, "Estado desconocido %d\n", p->state);
             abort();
     }
 
@@ -78,7 +78,7 @@ hello_error(const struct hello_parser *p) {
     char *ret;
     switch (p->state) {
         case hello_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         default:
             ret = "";

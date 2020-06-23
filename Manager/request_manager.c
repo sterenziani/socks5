@@ -138,7 +138,7 @@ request_manager_parser_feed(struct request_manager_parser *p, const uint8_t b) {
         case request_error_no_changes:
             break;
         default:
-            fprintf(stderr, "unknown state %d\n", p->state);
+            fprintf(stderr, "Estado desconocido %d\n", p->state);
             abort();
     }
 
@@ -176,13 +176,13 @@ request_manager_error(const struct request_manager_parser *p) {
     char *ret;
     switch (p->state) {
         case request_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         case request_error_invalid_command:
-            ret = "invalid command";
+            ret = "Comando inválido";
             break;
         case request_error_no_changes:
-            ret = "no changes could be made";
+            ret = "No se pudieron realizar cambios";
             break;
         default:
             ret = "";

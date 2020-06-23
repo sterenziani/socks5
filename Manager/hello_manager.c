@@ -3,7 +3,7 @@
 
 #include "hello_manager.h"
 
-extern void 
+extern void
 hello_manager_parser_init(struct hello_manager_parser *p) {
     p->state     = hello_version;
 }
@@ -32,13 +32,13 @@ hello_manager_parser_feed(struct hello_manager_parser *p, const uint8_t b) {
         case hello_error_invalid_user:
             break;
         default:
-            fprintf(stderr, "unknown state %d\n", p->state);
+            fprintf(stderr, "Estado desconocido%d\n", p->state);
             abort();
     }
     return p->state;
 }
 
-extern bool 
+extern bool
 hello_manager_is_done(const enum hello_manager_state state, bool *errored) {
     bool ret;
     switch (state) {
@@ -65,10 +65,10 @@ hello_manager_error(const struct hello_manager_parser *p) {
     char *ret;
     switch (p->state) {
         case hello_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         case hello_error_invalid_user:
-            ret = "invalid user or password";
+            ret = "Usuario y/o contraseña inválido";
             break;
         default:
             ret = "";
@@ -77,7 +77,7 @@ hello_manager_error(const struct hello_manager_parser *p) {
     return ret;
 }
 
-extern void 
+extern void
 hello__manager_parser_close(struct hello_manager_parser *p) {
 }
 
@@ -95,7 +95,7 @@ hello_manager_consume(buffer *b, struct hello_manager_parser *p, bool *errored) 
 }
 
 extern int
-hello_manager_marshall(buffer *b, const uint8_t user[], const int user_len, 
+hello_manager_marshall(buffer *b, const uint8_t user[], const int user_len,
     const uint8_t password[], const int pass_len) {
     size_t n;
 

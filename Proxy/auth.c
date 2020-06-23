@@ -103,7 +103,7 @@ extern const char * auth_error(const struct auth_parser *p){
   char *ret;
   switch (p->state) {
       case auth_error_unsupported_version:
-          ret = "unsupported version";
+          ret = "Versión no soportada";
           break;
       default:
           ret = "";

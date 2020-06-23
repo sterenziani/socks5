@@ -701,9 +701,20 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
             memcpy(&sock->origin_addr_storage, (struct sockaddr*) &address, INET_ADDRSTRLEN);
 
             selector_status st;
-            if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS){
-              d->parser.error = request_connection_fail;
-            }else if(errno == EINPROGRESS) {
+            if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS)
+            {
+              if(errno == ECONNREFUSED)
+                d->parser.error = request_connection_fail;
+              else if(errno == ENETUNREACH)
+                d->parser.error = request_network_unreachable;
+              else if(errno == ETIMEDOUT)
+                d->parser.error = request_ttl_expired;
+              else if(errno == EAFNOSUPPORT)
+                d->parser.error = request_unsupported_atyp;
+              else
+                d->parser.error = request_host_unreachable;
+            }
+            else if(errno == EINPROGRESS) {
               st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
               if(SELECTOR_SUCCESS != st) {
                 return ERROR;
@@ -775,9 +786,20 @@ static unsigned request_process(struct request_st* d, struct selector_key *key) 
           memcpy(&sock->origin_addr_storage, (struct sockaddr*) &address, INET6_ADDRSTRLEN);
 
           selector_status st;
-          if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS){
-            d->parser.error = request_connection_fail;
-          }else if(errno == EINPROGRESS) {
+          if (connect(sock->origin_fd, (struct sockaddr*) &address, sizeof(address)) != 0 && errno!=EINPROGRESS)
+          {
+            if(errno == ECONNREFUSED)
+              d->parser.error = request_connection_fail;
+            else if(errno == ENETUNREACH)
+              d->parser.error = request_network_unreachable;
+            else if(errno == ETIMEDOUT)
+              d->parser.error = request_ttl_expired;
+            else if(errno == EAFNOSUPPORT)
+              d->parser.error = request_unsupported_atyp;
+            else
+              d->parser.error = request_host_unreachable;
+          }
+          else if(errno == EINPROGRESS) {
             st = selector_set_interest(key->s, sock->client_fd, OP_NOOP);
             if(SELECTOR_SUCCESS != st) {
               return ERROR;
@@ -938,7 +960,8 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
           socket_type = sock->origin_resolution->ai_family;
         }
 
-        if (connect(sock->origin_fd, (const struct sockaddr *) sock->origin_resolution->ai_addr, sock->origin_resolution->ai_addrlen) != 0 && errno != EINPROGRESS){
+        if (connect(sock->origin_fd, (const struct sockaddr *) sock->origin_resolution->ai_addr, sock->origin_resolution->ai_addrlen) != 0 && errno != EINPROGRESS)
+        {
            aux = sock->origin_resolution;
            sock->origin_resolution = sock->origin_resolution->ai_next;
            aux->ai_next = NULL;
@@ -973,7 +996,6 @@ static unsigned request_connect(struct selector_key *key, struct socks5* sock)
         goto finally;
       }
     }else{
-      printf("connection failed\n");
       d->parser.error = request_connection_fail;
     }
     sock->references++;
@@ -1059,10 +1081,9 @@ static unsigned request_resolve_done(struct selector_key *key) {
     struct request_st *d = &ATTACHMENT(key)->client.request;
     if(sock->origin_resolution == NULL)
     {
-      fprintf(stdout, "Unable to connect client %d to requested origin server\n", sock->client_fd);
       freedohinfo(sock->origin_resolution);
       sock->origin_resolution = 0;
-      d->parser.error = request_connection_fail;
+      d->parser.error = request_host_unreachable;
     }
     else
     {

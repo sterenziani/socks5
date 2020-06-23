@@ -16,7 +16,7 @@ port(const char *s) {
      if (end == s|| '\0' != *end
         || ((LONG_MIN == sl || LONG_MAX == sl) && ERANGE == errno)
         || sl < 0 || sl > USHRT_MAX) {
-         fprintf(stderr, "port should in in the range of 1-65536: %s\n", s);
+         fprintf(stderr, "El puerto debe estar en el rango 1-65536: %s\n", s);
          exit(1);
          return 1;
      }
@@ -27,7 +27,7 @@ static void
 user(char *s, struct users *user) {
     char *p = strchr(s, ':');
     if(p == NULL) {
-        fprintf(stderr, "password not found\n");
+        fprintf(stderr, "Contraseña no encontrada\n");
         exit(1);
     } else {
         *p = 0;
@@ -40,15 +40,14 @@ user(char *s, struct users *user) {
 
 static void
 version(void) {
-    fprintf(stderr, "socksv5 version 1.0\n"
-                    "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
-                    "AQUI VA LA LICENCIA\n");
+  fprintf(stderr, "ManagerSocksv5 version 1.0\n"
+                  "ITBA Protocolos de Comunicación 2020/1 -- Grupo 2\n"
 }
 
 static void
 usage(const char *progname) {
     fprintf(stderr,
-        "Usage: %s [OPTION]...\n"
+        "Uso: %s [OPCIÓN]...\n"
         "\n"
         "   -h               Imprime la ayuda y termina.\n"
         "   -l <SOCKS addr>  Dirección donde servirá el proxy SOCKS.\n"
@@ -57,7 +56,7 @@ usage(const char *progname) {
         "   -a <name>:<pass> Agregar un usuario y contraseña.\n"
         "   -m               Obtener métricas sobre el funcionamiento del servidor.\n"
         "   -U               Listar usuarios del proxy.\n"
-        "   -s <new size>    Cambiar tamaño de clients. Máximo 505 clientes.\n"
+        "   -s <new size>    Cambiar cantidad máxima de clientes concurrentes. Máximo 505 clientes.\n"
         "   -v               Imprime información sobre la versión y termina.\n"
         ,
         progname);
@@ -146,13 +145,13 @@ parse_manager_args(const int argc, char **argv, struct manager_args *args) {
                 exit(0);
                 break;
             default:
-                fprintf(stderr, "unknown argument %d.\n", c);
+                fprintf(stderr, "Argumento desconocido %d.\n", c);
                 exit(1);
         }
 
     }
     if (optind < argc) {
-        fprintf(stderr, "argument not accepted: ");
+        fprintf(stderr, "Argumento no aceptadp: ");
         while (optind < argc) {
             fprintf(stderr, "%s ", argv[optind++]);
         }

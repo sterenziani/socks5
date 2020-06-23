@@ -138,10 +138,10 @@ request_manager_server_error(const struct request_manager_server_parser *p) {
     char *ret;
     switch (p->state) {
         case request_server_error_unsupported_version:
-            ret = "unsupported version";
+            ret = "Versión no soportada";
             break;
         case request_server_error_invalid_command:
-            ret = "invalid command";
+            ret = "Comando inválido";
             break;
         default:
             ret = "";
